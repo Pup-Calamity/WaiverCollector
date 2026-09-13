@@ -1,79 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WaiverIO</title>
+    <!-- Load PDF.js directly -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <style>
         body { font-family: sans-serif; padding: 20px; }
-        button { padding: 10px 20px; margin-right: 10px; margin-bottom: 10px; cursor: pointer; }
-        #output { background: #1e1e1e; color: #4af626; padding: 20px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; height: 150px; overflow-y: auto; }
+        button { padding: 10px 20px; font-size: 14px; cursor: pointer; margin-right: 10px; margin-bottom: 10px; }
         .action-group { margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px; background: #f9f9f9; }
+        canvas { border: 2px solid #333; margin-top: 20px; max-width: 100%; cursor: crosshair; }
     </style>
 </head>
 <body>
-    <h2>Waiver Management Engine</h2>
-    <button id="folderBtn">1. Connect Master AR Folder</button>
-
+    <h2>Visual Template Mapper</h2>
+    
     <div class="action-group">
-        <strong>Visual Template Mapper</strong><br><br>
         <button id="loadPdfBtn">1. Load PDF to Canvas</button>
         <button id="saveMapBtn" disabled>2. Save JSON Map</button>
-        
-        <div style="margin-top: 15px; border: 1px solid #ccc; display: inline-block;">
-            <canvas id="pdfCanvas" style="cursor: crosshair;"></canvas>
-        </div>
+        <br>
+        <canvas id="pdfCanvas"></canvas>
     </div>
-    
-    <div class="action-group">
-        <strong>Template Manager</strong><br><br>
-        <button id="uploadTemplateBtn" disabled>Upload New PDF Template</button>
-    </div>
-    
-    <p><strong>Console:</strong></p>
-    <div id="output">Waiting for folder connection...</div>
 
     <script>
-        let dirHandle;
+        // Force the correct global variable and worker configuration for PDF.js
+        const pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-        // 1. Connect to the master folder
-        document.getElementById('folderBtn').addEventListener('click', async () => {
+        let pdfViewport = null;
+        let templateMap = { fields: {} };
+
+        // 1. Load the PDF
+        document.getElementById('loadPdfBtn').addEventListener('click', async () => {
             try {
-                dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' }); 
-                document.getElementById('output').textContent = `Connected to: ${dirHandle.name}\nReady for operations.`;
-                document.getElementById('uploadTemplateBtn').disabled = false;
+                const [fileHandle] = await window.showOpenFilePicker({
+                    types: [{ accept: { 'application/pdf': ['.pdf'] } }]
+                });
+                const file = await fileHandle.getFile();
+                const arrayBuffer = await file.arrayBuffer();
+
+                const pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
+                const page = await pdfDoc.getPage(1);
+                
+                pdfViewport = page.getViewport({ scale: 1.5 });
+                const canvas = document.getElementById('pdfCanvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = pdfViewport.width;
+                canvas.height = pdfViewport.height;
+
+                await page.render({ canvasContext: ctx, viewport: pdfViewport }).promise;
+                document.getElementById('saveMapBtn').disabled = false;
+                
             } catch (error) {
-                document.getElementById('output').textContent = "Folder connection failed.";
+                alert(`Error loading PDF: ${error.message}`);
             }
         });
 
-        // 2. Upload and store a new template
-        document.getElementById('uploadTemplateBtn').addEventListener('click', async () => {
+        // 2. Capture clicks on the canvas
+        document.getElementById('pdfCanvas').addEventListener('click', (e) => {
+            if (!pdfViewport) return;
+
+            const canvas = document.getElementById('pdfCanvas');
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            // Convert to PDF coordinates
+            const pdfX = clickX / pdfViewport.scale;
+            const pdfY = (pdfViewport.height - clickY) / pdfViewport.scale;
+
+            const variableName = prompt("Enter variable name (e.g., vendorName, amount):");
+
+            if (variableName) {
+                templateMap.fields[variableName] = { x: pdfX, y: pdfY, size: 12 };
+
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = 'rgba(74, 246, 38, 0.4)';
+                ctx.fillRect(clickX, clickY - 14, 120, 18);
+                ctx.fillStyle = 'black';
+                ctx.font = '14px Arial';
+                ctx.fillText(variableName, clickX + 4, clickY - 1);
+            }
+        });
+
+        // 3. Save the JSON file
+        document.getElementById('saveMapBtn').addEventListener('click', async () => {
             try {
-                const outputDiv = document.getElementById('output');
-                
-                // Prompt user to select a PDF file from anywhere on their computer
-                const [fileHandle] = await window.showOpenFilePicker({
-                    types: [{ description: 'PDF Templates', accept: { 'application/pdf': ['.pdf'] } }]
-                });
-                const file = await fileHandle.getFile();
-                outputDiv.textContent = `Selected template: ${file.name}\nCreating Templates subfolder...`;
-
-                // Get or create the "Templates" subfolder inside the connected AR folder
-                const templatesDir = await dirHandle.getDirectoryHandle('Templates', { create: true });
-
-                // Create a new file inside the Templates subfolder and write the PDF data to it
-                const newFileHandle = await templatesDir.getFileHandle(file.name, { create: true });
-                const writable = await newFileHandle.createWritable();
-                await writable.write(file);
+                const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                const fileHandle = await dirHandle.getFileHandle('Template_Config.json', { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(JSON.stringify(templateMap, null, 2));
                 await writable.close();
-
-                outputDiv.textContent += `\nSuccess! Template saved to /Templates/${file.name}`;
-
+                alert('Configuration saved successfully!');
             } catch (error) {
-                document.getElementById('output').textContent = `Upload failed: ${error.message}`;
+                alert(`Failed to save: ${error.message}`);
             }
         });
     </script>
