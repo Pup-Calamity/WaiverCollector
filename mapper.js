@@ -14,7 +14,6 @@ let hasMoved = false;
 let drawStartX = 0;
 let drawStartY = 0;
 
-// Default list in case the variables.json file gets deleted
 let availableVariables = ["vendorName", "amount", "projectName", "contractDate"]; 
 
 const output = document.getElementById('output');
@@ -28,7 +27,6 @@ async function verifyPermission(fileHandle) {
     return false;
 }
 
-// Scans the Data folder for variables.json. If it doesn't exist, it builds it.
 async function loadVariablesList() {
     try {
         const dataDir = await dirHandle.getDirectoryHandle('Data', { create: true });
@@ -72,12 +70,20 @@ async function refreshTemplateList() {
     }
 }
 
+// UI Toggles
 async function setupDirectory(handle) {
     dirHandle = handle;
-    output.textContent = `Connected: ${dirHandle.name}`;
-    document.getElementById('loadPdfBtn').disabled = false;
+    
+    // Hide connection card, show workspace
+    document.getElementById('connectionCard').style.display = 'none';
+    document.getElementById('mapperWorkspace').style.display = 'block';
+    
+    // Update the Nav bar status
+    const navStatus = document.getElementById('navStatus');
+    if(navStatus) navStatus.textContent = `✅ Connected: ${dirHandle.name}`;
+
     await refreshTemplateList();
-    await loadVariablesList(); // Load the JSON variables list
+    await loadVariablesList();
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -98,7 +104,7 @@ document.getElementById('connectFolderBtn').addEventListener('click', async () =
         await set('masterARFolder', newHandle);
         await setupDirectory(newHandle);
     } catch (error) {
-        output.textContent = `Connection failed: ${error.message}`;
+        alert(`Connection failed: ${error.message}`);
     }
 });
 
