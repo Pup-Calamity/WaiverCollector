@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WaiverIO</title>
-    <!-- Load PDF.js directly -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <style>
         body { font-family: sans-serif; padding: 20px; }
@@ -23,80 +22,7 @@
         <canvas id="pdfCanvas"></canvas>
     </div>
 
-    <script>
-        // Force the correct global variable and worker configuration for PDF.js
-        const pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-
-        let pdfViewport = null;
-        let templateMap = { fields: {} };
-
-        // 1. Load the PDF
-        document.getElementById('loadPdfBtn').addEventListener('click', async () => {
-            try {
-                const [fileHandle] = await window.showOpenFilePicker({
-                    types: [{ accept: { 'application/pdf': ['.pdf'] } }]
-                });
-                const file = await fileHandle.getFile();
-                const arrayBuffer = await file.arrayBuffer();
-
-                const pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
-                const page = await pdfDoc.getPage(1);
-                
-                pdfViewport = page.getViewport({ scale: 1.5 });
-                const canvas = document.getElementById('pdfCanvas');
-                const ctx = canvas.getContext('2d');
-                canvas.width = pdfViewport.width;
-                canvas.height = pdfViewport.height;
-
-                await page.render({ canvasContext: ctx, viewport: pdfViewport }).promise;
-                document.getElementById('saveMapBtn').disabled = false;
-                
-            } catch (error) {
-                alert(`Error loading PDF: ${error.message}`);
-            }
-        });
-
-        // 2. Capture clicks on the canvas
-        document.getElementById('pdfCanvas').addEventListener('click', (e) => {
-            if (!pdfViewport) return;
-
-            const canvas = document.getElementById('pdfCanvas');
-            const rect = canvas.getBoundingClientRect();
-            const clickX = e.clientX - rect.left;
-            const clickY = e.clientY - rect.top;
-
-            // Convert to PDF coordinates
-            const pdfX = clickX / pdfViewport.scale;
-            const pdfY = (pdfViewport.height - clickY) / pdfViewport.scale;
-
-            const variableName = prompt("Enter variable name (e.g., vendorName, amount):");
-
-            if (variableName) {
-                templateMap.fields[variableName] = { x: pdfX, y: pdfY, size: 12 };
-
-                const ctx = canvas.getContext('2d');
-                ctx.fillStyle = 'rgba(74, 246, 38, 0.4)';
-                ctx.fillRect(clickX, clickY - 14, 120, 18);
-                ctx.fillStyle = 'black';
-                ctx.font = '14px Arial';
-                ctx.fillText(variableName, clickX + 4, clickY - 1);
-            }
-        });
-
-        // 3. Save the JSON file
-        document.getElementById('saveMapBtn').addEventListener('click', async () => {
-            try {
-                const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-                const fileHandle = await dirHandle.getFileHandle('Template_Config.json', { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(JSON.stringify(templateMap, null, 2));
-                await writable.close();
-                alert('Configuration saved successfully!');
-            } catch (error) {
-                alert(`Failed to save: ${error.message}`);
-            }
-        });
-    </script>
+    <!-- Explicitly load the app controller as a module -->
+    <script type="module" src="./app.js"></script>
 </body>
 </html>
