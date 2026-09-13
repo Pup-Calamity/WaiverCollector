@@ -131,7 +131,7 @@ canvas.addEventListener('mousemove', (e) => {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    if (dragField.type === 'variable') {
+    if (dragField && dragField.type === 'variable') {
         hasMoved = true;
         const pdfX = mouseX / pdfViewport.scale;
         const pdfY = (pdfViewport.height - mouseY) / pdfViewport.scale;
@@ -139,14 +139,21 @@ canvas.addEventListener('mousemove', (e) => {
         templateMap.fields[dragField.id].y = pdfY;
         redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
     } 
-    else if (dragField.type === 'drawing_coverup') {
-        // Render the box dynamically as we drag
+    else if (dragField && dragField.type === 'drawing_coverup') {
+        // Redraw base PDF to clear previous frame of the animation
         redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
+        
+        // Math to support dragging in any direction
+        const boxX = Math.min(drawStartX, mouseX);
+        const boxY = Math.min(drawStartY, mouseY);
+        const boxW = Math.abs(mouseX - drawStartX);
+        const boxH = Math.abs(mouseY - drawStartY);
+
         const ctx = canvas.getContext('2d');
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.fillRect(drawStartX, drawStartY, mouseX - drawStartX, mouseY - drawStartY);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; // Semi-transparent white while dragging
+        ctx.fillRect(boxX, boxY, boxW, boxH);
         ctx.strokeStyle = 'red';
-        ctx.strokeRect(drawStartX, drawStartY, mouseX - drawStartX, mouseY - drawStartY);
+        ctx.strokeRect(boxX, boxY, boxW, boxH);
     }
 });
 
@@ -158,22 +165,28 @@ canvas.addEventListener('mouseup', (e) => {
     const mouseY = e.clientY - rect.top;
 
     if (dragField && dragField.type === 'drawing_coverup') {
-        // Finish drawing the whiteout box and save to PDF coordinates
-        const width = Math.abs(mouseX - drawStartX) / pdfViewport.scale;
-        const height = Math.abs(mouseY - drawStartY) / pdfViewport.scale;
-        const pdfX = Math.min(drawStartX, mouseX) / pdfViewport.scale;
+        // Calculate final dimensions regardless of drag direction
+        const pixelW = Math.abs(mouseX - drawStartX);
+        const pixelH = Math.abs(mouseY - drawStartY);
         
-        // Calculate bottom-left Y coordinate for pdf-lib
-        const topY = Math.min(drawStartY, mouseY);
-        const pdfY = (pdfViewport.height - topY) / pdfViewport.scale - height;
+        if (pixelW > 5 && pixelH > 5) { // Prevent tiny accidental clicks
+            const pdfW = pixelW / pdfViewport.scale;
+            const pdfH = pixelH / pdfViewport.scale;
+            
+            // X is the leftmost point
+            const pdfX = Math.min(drawStartX, mouseX) / pdfViewport.scale;
+            
+            // Y in pdf-lib is from the bottom of the page to the bottom of the rectangle
+            const bottomPixelY = Math.max(drawStartY, mouseY); 
+            const pdfY = (pdfViewport.height - bottomPixelY) / pdfViewport.scale;
 
-        if (width > 5 && height > 5) { // Prevent tiny accidental clicks
-            templateMap.coverUps.push({ x: pdfX, y: pdfY, width: width, height: height });
+            // Push to the array we guaranteed exists in the load step
+            templateMap.coverUps.push({ x: pdfX, y: pdfY, width: pdfW, height: pdfH });
         }
+        // Force a redraw so it locks in the solid white box with red border
         redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
     } 
     else if (dragField && !hasMoved) {
-        // DELETE LOGIC: We clicked an item but didn't move it.
         const confirmMsg = dragField.type === 'variable' 
             ? `Delete variable '${dragField.id}'?` 
             : `Delete this cover-up box?`;
@@ -188,7 +201,6 @@ canvas.addEventListener('mouseup', (e) => {
         }
     } 
     else if (!dragField && currentTool === 'variable') {
-        // Clicked empty space in variable mode -> Add new variable
         const variableName = prompt("Enter exact variable name:");
         if (variableName) {
             const pdfX = mouseX / pdfViewport.scale;
