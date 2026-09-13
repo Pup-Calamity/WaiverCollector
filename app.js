@@ -1,98 +1,115 @@
+import { configurePdfJs, handleCanvasClick } from './templateEditor.js';
 import { extractVendorData } from './dataParser.js';
 import { stampWaiverWithConfig } from './pdfEngine.js';
-import { initTemplateEditor } from './templateEditor.js';
 import { generateEmlBlob } from './emailEngine.js';
 
-// Global state to hold the directory connection
 let dirHandle;
+const pdfjsLib = configurePdfJs();
+let pdfViewport = null;
+let templateMap = { fields: {} };
+const output = document.getElementById('output');
 
-// 1. Connect Folder & Initialize Systems
-document.getElementById('folderBtn').addEventListener('click', async () => {
+// 1. Connect Folder
+document.getElementById('connectFolderBtn').addEventListener('click', async () => {
     try {
         dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-        document.getElementById('output').textContent = `Connected to: ${dirHandle.name}\nReady for operations.`;
-
-        // Pass the directory handle to the visual editor so it can save JSON maps
-        initTemplateEditor(dirHandle);
-
-        // Enable the main processing button
-        document.getElementById('readExcelBtn').disabled = false;
+        output.textContent = `Connected: ${dirHandle.name}`;
+        
+        document.getElementById('loadPdfBtn').disabled = false;
+        document.getElementById('processWaiverBtn').disabled = false;
     } catch (error) {
-        console.error(error);
-        document.getElementById('output').textContent = "Folder connection failed.";
+        output.textContent = `Connection failed: ${error.message}`;
     }
 });
 
-// 2. The Main Processing Pipeline
-document.getElementById('readExcelBtn').addEventListener('click', async () => {
+// 2. Visual Mapper Logic
+document.getElementById('loadPdfBtn').addEventListener('click', async () => {
     try {
-        const outputDiv = document.getElementById('output');
-        outputDiv.textContent = "Processing pipeline started...\n";
+        const [fileHandle] = await window.showOpenFilePicker({ types: [{ accept: { 'application/pdf': ['.pdf'] } }] });
+        const file = await fileHandle.getFile();
+        const arrayBuffer = await file.arrayBuffer();
 
-        // A. Define Target (In the final UI, these come from your search boxes)
-        const targetJob = "12345";
-        const targetVendor = "Acme Concrete";
-
-        // B. Extract Data from Local Excel
-        const excelFileHandle = await dirHandle.getFileHandle('Invoices.xlsx', { create: false });
-        const excelFile = await excelFileHandle.getFile();
-        const excelBuffer = await excelFile.arrayBuffer();
-
-        const vendorData = await extractVendorData(excelBuffer, targetJob, targetVendor);
-        outputDiv.textContent += `Data extracted for ${vendorData.vendorName}.\n`;
-
-        // C. Load PDF Template and JSON Config from the /Templates subfolder
-        const templatesDir = await dirHandle.getDirectoryHandle('Templates');
+        const pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
+        const page = await pdfDoc.getPage(1);
         
-        // Ensure these exact file names exist in your Templates folder for testing
-        const pdfHandle = await templatesDir.getFileHandle('WaiverTemplate.pdf');
-        const pdfFile = await pdfHandle.getFile();
-        const pdfBuffer = await pdfFile.arrayBuffer();
+        pdfViewport = page.getViewport({ scale: 1.5 });
+        const canvas = document.getElementById('pdfCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = pdfViewport.width;
+        canvas.height = pdfViewport.height;
 
-        const configHandle = await templatesDir.getFileHandle('WaiverTemplate_Config.json');
-        const configFile = await configHandle.getFile();
-        const configText = await configFile.text();
-        const configJson = JSON.parse(configText);
+        await page.render({ canvasContext: ctx, viewport: pdfViewport }).promise;
+        document.getElementById('saveMapBtn').disabled = false;
+    } catch (error) {
+        alert(`Error loading PDF: ${error.message}`);
+    }
+});
 
-        // D. Stamp the PDF using the mapped coordinates
-        const stampedPdfBytes = await stampWaiverWithConfig(pdfBuffer, vendorData, configJson);
+document.getElementById('pdfCanvas').addEventListener('click', (e) => {
+    handleCanvasClick(e, pdfViewport, templateMap);
+});
 
-        // E. Save the Finished PDF back to the main directory
-        const saveFileName = `${vendorData.vendorName}_Waiver.pdf`;
-        const newFileHandle = await dirHandle.getFileHandle(saveFileName, { create: true });
-        const writable = await newFileHandle.createWritable();
-        await writable.write(stampedPdfBytes);
+document.getElementById('saveMapBtn').addEventListener('click', async () => {
+    try {
+        const templatesDir = await dirHandle.getDirectoryHandle('Templates', { create: true });
+        const fileHandle = await templatesDir.getFileHandle('Template_Config.json', { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(JSON.stringify(templateMap, null, 2));
         await writable.close();
+        alert('Configuration saved!');
+    } catch (error) {
+        alert(`Save failed: ${error.message}`);
+    }
+});
 
-        outputDiv.textContent += `Success! Stamped and saved as ${saveFileName}.`;
+// 3. Waiver Processing Logic
+document.getElementById('processWaiverBtn').addEventListener('click', async () => {
+    const job = document.getElementById('jobInput').value;
+    const vendor = document.getElementById('vendorInput').value;
+    
+    if (!job || !vendor) return alert("Enter Job and Vendor.");
+    
+    try {
+        output.textContent = "Processing started...\n";
+
+        // Extract Data
+        const excelFileHandle = await dirHandle.getFileHandle('Invoices.xlsx');
+        const excelFile = await excelFileHandle.getFile();
+        const vendorData = await extractVendorData(await excelFile.arrayBuffer(), job, vendor);
+        output.textContent += `Data extracted for ${vendorData.vendorName}.\n`;
+
+        // Load Template & Config
+        const templatesDir = await dirHandle.getDirectoryHandle('Templates');
+        const pdfFileHandle = await templatesDir.getFileHandle('WaiverTemplate.pdf');
+        const configHandle = await templatesDir.getFileHandle('Template_Config.json');
         
-        // 1. Prepare the email contents
+        const configJson = JSON.parse(await (await configHandle.getFile()).text());
+        const stampedPdfBytes = await stampWaiverWithConfig(await (await pdfFileHandle.getFile()).arrayBuffer(), vendorData, configJson);
+
+        // Save PDF
+        const pdfName = `${vendor.replace(/[^a-z0-9]/gi, '_')}_Waiver.pdf`;
+        const newPdfHandle = await dirHandle.getFileHandle(pdfName, { create: true });
+        const pdfWritable = await newPdfHandle.createWritable();
+        await pdfWritable.write(stampedPdfBytes);
+        await pdfWritable.close();
+
+        // Generate & Save .eml
         const emailConfig = {
-            to: "vendor.contact@example.com",
+            to: "vendor@example.com",
             cc: "altmanb@lithko.com",
-            subject: `Monthly Waiver Request - ${vendorData.projectName}`,
-            bodyHTML: `<span style="font-size: 16px; font-family: sans-serif;">
-                           Hello,<br><br>
-                           Could you please process the attached waiver as soon as you can? 
-                           We are expecting the waivers returned shortly.<br><br>
-                           Thank you
-                       </span>`
+            subject: `Waiver Request - ${vendorData.projectName}`,
+            bodyHTML: `<span style="font-size: 16px; font-family: sans-serif;">Please process the attached waiver.</span>`
         };
+        const emlBlob = generateEmlBlob(emailConfig, stampedPdfBytes, pdfName);
         
-        // 2. Generate the .eml file blob, passing in the stampedPdfBytes we already made
-        const emlBlob = generateEmlBlob(emailConfig, stampedPdfBytes, saveFileName);
-        
-        // 3. Save the .eml file to the local directory
-        const emlFileName = `${vendorData.vendorName}_Waiver_Draft.eml`;
-        const emlFileHandle = await dirHandle.getFileHandle(emlFileName, { create: true });
-        const emlWritable = await emlFileHandle.createWritable();
+        const emlName = `${vendor.replace(/[^a-z0-9]/gi, '_')}_Draft.eml`;
+        const emlHandle = await dirHandle.getFileHandle(emlName, { create: true });
+        const emlWritable = await emlHandle.createWritable();
         await emlWritable.write(emlBlob);
         await emlWritable.close();
-        
-        outputDiv.textContent += `\nDraft email saved as ${emlFileName}. Double-click to open in Outlook!`;
 
+        output.textContent += `Success! Saved ${pdfName} and ${emlName}.`;
     } catch (error) {
-        console.error(error);
-        document.getElementById('output').textContent += `\nError: ${error.message}`;
+        output.textContent += `Error: ${error.message}`;
     }
 });
