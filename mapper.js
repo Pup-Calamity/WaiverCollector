@@ -1,7 +1,7 @@
-import { configurePdfJs, handleCanvasClick } from './templateEditor.js';
+// mapper.js
+import { getPdfJsLib, handleCanvasClick } from './templateEditor.js';
 
 let dirHandle;
-const pdfjsLib = configurePdfJs();
 let pdfViewport = null;
 let templateMap = { fields: {} };
 const output = document.getElementById('output');
@@ -18,6 +18,9 @@ document.getElementById('connectFolderBtn').addEventListener('click', async () =
 
 document.getElementById('loadPdfBtn').addEventListener('click', async () => {
     try {
+        // Initialize PDF.js safely after the click
+        const pdfjsLib = getPdfJsLib();
+
         const [fileHandle] = await window.showOpenFilePicker({ types: [{ accept: { 'application/pdf': ['.pdf'] } }] });
         const file = await fileHandle.getFile();
         const arrayBuffer = await file.arrayBuffer();
