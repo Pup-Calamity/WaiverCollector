@@ -13,9 +13,12 @@
         .card { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         button { padding: 10px 15px; cursor: pointer; margin: 5px 5px 15px 0; background: #0056b3; color: white; border: none; border-radius: 4px; }
         button:disabled { background: #ccc; cursor: not-allowed; }
-        /* Added user-select: none to prevent text highlighting while dragging */
         canvas { border: 2px solid #333; max-width: 100%; cursor: crosshair; display: block; margin-top: 15px; user-select: none; }
         #output { background: #1e1e1e; color: #4af626; padding: 15px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; height: 60px; overflow-y: auto; margin-bottom: 15px; }
+        
+        /* New Toolbar Styling */
+        .toolbar { margin: 15px 0; padding: 15px; background: #e9ecef; border-radius: 5px; border: 1px solid #ccc; }
+        .toolbar label { margin-right: 20px; cursor: pointer; font-size: 16px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -25,13 +28,33 @@
     </nav>
 
     <div class="card">
+        <h2>Manage Saved Templates</h2>
+        <select id="templateDropdown" style="padding: 8px; margin-right: 10px;">
+            <option value="">-- Connect folder to load templates --</option>
+        </select>
+        <button id="deleteTemplateBtn" disabled style="background: #dc3545;">Delete Selected Template</button>
+    </div>
+
+    <div class="card">
         <h2>Visual Template Mapper</h2>
         <button id="connectFolderBtn">1. Connect Master AR Folder</button>
         <div id="output">Waiting for folder connection...</div>
         
         <button id="loadPdfBtn" disabled>2. Load PDF to Canvas</button>
         <button id="saveMapBtn" disabled>3. Save JSON Map</button>
-        <button id="undoBtn" disabled>4. Undo Last Action</button>
+        
+        <!-- The New Highly Visible Toolbar -->
+        <div class="toolbar">
+            <label>
+                <input type="radio" name="toolMode" value="variable" checked> 🟢 Click to Add/Move Variables
+            </label>
+            <label>
+                <input type="radio" name="toolMode" value="coverup"> ⬜ Click & Drag to Draw Whiteout
+            </label>
+            <div style="margin-top: 10px; font-size: 14px; color: #555;">
+                <em>Hint: <strong>Right-Click</strong> any green variable or whiteout box to delete it!</em>
+            </div>
+        </div>
         
         <canvas id="pdfCanvas"></canvas>
     </div>
