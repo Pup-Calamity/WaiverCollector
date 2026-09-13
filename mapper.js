@@ -1,12 +1,35 @@
 // mapper.js
-import { get, set } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
 import { getPdfJsLib, redrawCanvas, getHoveredItem } from './templateEditor.js';
+
+// --- Native Database Setup (No external libraries) ---
+const dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open('WaiverIO_DB', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('keyval');
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = () => reject(req.error);
+});
+async function get(key) {
+    const db = await dbPromise;
+    return new Promise(resolve => {
+        const req = db.transaction('keyval').objectStore('keyval').get(key);
+        req.onsuccess = () => resolve(req.result);
+    });
+}
+async function set(key, val) {
+    const db = await dbPromise;
+    return new Promise(resolve => {
+        const tx = db.transaction('keyval', 'readwrite');
+        tx.objectStore('keyval').put(val, key);
+        tx.oncomplete = () => resolve();
+    });
+}
+// ----------------------------------------------------
 
 let dirHandle;
 let pdfViewport = null;
 let templateMap = { fields: {}, coverUps: [] };
 let currentPdfName = "Template"; 
-let offscreenCanvas = null; 
+let offscreenCanvas = null;
 
 let isDragging = false;
 let dragField = null;
