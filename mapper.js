@@ -1,9 +1,10 @@
 // mapper.js
-import { getPdfJsLib, handleCanvasClick } from './templateEditor.js';
+import { getPdfJsLib, handleCanvasClick, loadExistingMap } from './templateEditor.js';
 
 let dirHandle;
 let pdfViewport = null;
 let templateMap = { fields: {} };
+let currentPdfName = "Template"; // Track the name of the loaded PDF
 const output = document.getElementById('output');
 
 document.getElementById('connectFolderBtn').addEventListener('click', async () => {
@@ -18,11 +19,11 @@ document.getElementById('connectFolderBtn').addEventListener('click', async () =
 
 document.getElementById('loadPdfBtn').addEventListener('click', async () => {
     try {
-        // Initialize PDF.js safely after the click
         const pdfjsLib = getPdfJsLib();
 
         const [fileHandle] = await window.showOpenFilePicker({ types: [{ accept: { 'application/pdf': ['.pdf'] } }] });
         const file = await fileHandle.getFile();
+        currentPdfName = file.name; // Save the name for the JSON file
         const arrayBuffer = await file.arrayBuffer();
 
         const pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
@@ -36,7 +37,24 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
 
         await page.render({ canvasContext: ctx, viewport: pdfViewport }).promise;
         document.getElementById('saveMapBtn').disabled = false;
-        output.textContent = `Loaded ${file.name}. Click canvas to map variables.`;
+
+        // --- NEW: Attempt to load an existing JSON config ---
+        try {
+            const templatesDir = await dirHandle.getDirectoryHandle('Templates');
+            const configName = currentPdfName.replace('.pdf', '_Config.json');
+            const configHandle = await templatesDir.getFileHandle(configName);
+            const configFile = await configHandle.getFile();
+            
+            templateMap = JSON.parse(await configFile.text());
+            loadExistingMap(canvas, pdfViewport, templateMap);
+            
+            output.textContent = `Loaded ${currentPdfName} and existing JSON map! Click canvas to add/edit.`;
+        } catch (err) {
+            // If the file doesn't exist, start fresh
+            templateMap = { fields: {} };
+            output.textContent = `Loaded ${currentPdfName}. No existing map found. Click canvas to map variables.`;
+        }
+        
     } catch (error) {
         alert(`Error loading PDF: ${error.message}`);
     }
@@ -49,11 +67,15 @@ document.getElementById('pdfCanvas').addEventListener('click', (e) => {
 document.getElementById('saveMapBtn').addEventListener('click', async () => {
     try {
         const templatesDir = await dirHandle.getDirectoryHandle('Templates', { create: true });
-        const fileHandle = await templatesDir.getFileHandle('Template_Config.json', { create: true });
+        
+        // Dynamically name the JSON file to match the PDF
+        const configName = currentPdfName.replace('.pdf', '_Config.json');
+        const fileHandle = await templatesDir.getFileHandle(configName, { create: true });
         const writable = await fileHandle.createWritable();
+        
         await writable.write(JSON.stringify(templateMap, null, 2));
         await writable.close();
-        alert('Configuration saved to the Templates folder!');
+        alert(`Configuration saved as ${configName}!`);
     } catch (error) {
         alert(`Save failed: ${error.message}`);
     }
