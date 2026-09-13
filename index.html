@@ -4,67 +4,92 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WaiverIO</title>
-    <!-- Load SheetJS for Excel Parsing -->
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <!-- Load html2pdf for PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         body { font-family: sans-serif; padding: 20px; }
-        button { padding: 10px 20px; margin-right: 10px; cursor: pointer; }
-        #output { background: #1e1e1e; color: #4af626; padding: 20px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; height: 300px; overflow-y: auto; }
+        button { padding: 10px 20px; margin-right: 10px; margin-bottom: 10px; cursor: pointer; }
+        #output { background: #1e1e1e; color: #4af626; padding: 20px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; height: 150px; overflow-y: auto; }
+        
+        /* The hidden HTML template replicating your Word document */
+        #waiverTemplate { display: none; padding: 40px; font-family: 'Times New Roman', serif; }
+        .visible-template { display: block !important; position: absolute; left: -9999px; } /* Rendered off-screen for the PDF engine */
     </style>
 </head>
 <body>
-    <h2>Local Excel Connection</h2>
-    <button id="folderBtn">1. Connect Waiver Folder</button>
-    <button id="readExcelBtn" disabled>2. Read Tracker Data</button>
+    <h2>PDF Generation Engine</h2>
+    <button id="folderBtn">1. Connect Folder (Requires Edit Access)</button>
+    <button id="generatePdfBtn" disabled>2. Generate & Save PDF</button>
     
-    <p><strong>Data Output:</strong></p>
+    <p><strong>Console:</strong></p>
     <div id="output">Waiting for folder connection...</div>
+
+    <!-- The actual waiver layout -->
+    <div id="waiverTemplate">
+        <h1 style="text-align: center;">CONDITIONAL WAIVER AND RELEASE</h1>
+        <p><strong>Project:</strong> <span id="tpl-project"></span></p>
+        <p><strong>Vendor:</strong> <span id="tpl-vendor"></span></p>
+        <p><strong>Amount:</strong> $<span id="tpl-amount"></span></p>
+        <p>Upon receipt by the undersigned of a check in the above referenced Payment Amount payable to the undersigned, and when the check has been properly endorsed and has been paid by the bank, this document becomes effective...</p>
+    </div>
 
     <script>
         let dirHandle;
+        
+        // Hardcoded dummy data mimicking what we just extracted from SheetJS
+        const extractedData = {
+            project: "Red River Gorge Visitor Center", 
+            vendor: "Acme Concrete",
+            amount: "45,000.00"
+        };
 
-        // Step 1: Connect to the folder
         document.getElementById('folderBtn').addEventListener('click', async () => {
             try {
-                dirHandle = await window.showDirectoryPicker();
-                document.getElementById('output').textContent = `Connected to folder: ${dirHandle.name}\nReady to read Excel data.`;
-                document.getElementById('readExcelBtn').disabled = false;
+                // Request READWRITE access so we can save the PDF back to the drive
+                dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' }); 
+                document.getElementById('output').textContent = `Connected to: ${dirHandle.name}\nReady to generate document.`;
+                document.getElementById('generatePdfBtn').disabled = false;
             } catch (error) {
-                document.getElementById('output').textContent = "Folder selection cancelled.";
+                document.getElementById('output').textContent = "Folder connection failed.";
             }
         });
 
-        // Step 2: Read the Excel File
-        document.getElementById('readExcelBtn').addEventListener('click', async () => {
+        document.getElementById('generatePdfBtn').addEventListener('click', async () => {
             try {
                 const outputDiv = document.getElementById('output');
-                outputDiv.textContent = "Loading Excel file...\n";
+                outputDiv.textContent = "Injecting data and rendering PDF...\n";
 
-                // NOTE: Change 'Invoices.xlsx' to the exact name of a file in your test folder
-                const targetFileName = 'Invoices.xlsx'; 
-                
-                const fileHandle = await dirHandle.getFileHandle(targetFileName, { create: false });
-                const file = await fileHandle.getFile();
-                const arrayBuffer = await file.arrayBuffer();
+                // 1. Inject data into the HTML template (Replaces your VBA Find/Replace loop)
+                document.getElementById('tpl-project').textContent = extractedData.project;
+                document.getElementById('tpl-vendor').textContent = extractedData.vendor;
+                document.getElementById('tpl-amount').textContent = extractedData.amount;
 
-                // Parse the Excel file using SheetJS
-                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-                
-                // Grab the first sheet
-                const firstSheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[firstSheetName];
+                const templateElement = document.getElementById('waiverTemplate');
+                templateElement.classList.add('visible-template'); 
 
-                // Convert sheet to an array of JavaScript objects (JSON)
-                const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                // 2. Configure the PDF parameters
+                const pdfOptions = {
+                    margin:       1,
+                    filename:     'Waiver.pdf',
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2 },
+                    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+                };
 
-                // Display the first 3 rows to prove it worked
-                outputDiv.textContent = `Successfully parsed ${targetFileName}!\n\n` + 
-                                        `Total Rows: ${jsonData.length}\n\n` +
-                                        `First 3 Rows Data:\n` + 
-                                        JSON.stringify(jsonData.slice(0, 3), null, 2);
+                // 3. Render the HTML into a raw PDF Blob in memory
+                const pdfBlob = await html2pdf().set(pdfOptions).from(templateElement).output('blob');
+                templateElement.classList.remove('visible-template');
+
+                // 4. Save that Blob directly back to the selected local folder
+                const newFileHandle = await dirHandle.getFileHandle(`${extractedData.vendor}_Waiver.pdf`, { create: true });
+                const writable = await newFileHandle.createWritable();
+                await writable.write(pdfBlob);
+                await writable.close();
+
+                outputDiv.textContent += `\nSuccess! ${extractedData.vendor}_Waiver.pdf saved directly to your folder.`;
 
             } catch (error) {
-                document.getElementById('output').textContent = `Error finding or reading file: ${error.message}\nMake sure the file name matches exactly.`;
+                document.getElementById('output').textContent = `Error saving PDF: ${error.message}`;
             }
         });
     </script>
