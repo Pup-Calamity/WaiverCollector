@@ -8,42 +8,43 @@ export function getPdfJsLib() {
     return window.pdfjsLib;
 }
 
-// Helper to draw the green boxes so we can reuse it
-function drawMarker(canvas, x, y, label) {
+// Clears the canvas, paints the raw PDF snapshot, and draws all active markers
+export function redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap) {
+    if (!pdfViewport || !offscreenCanvas) return;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'rgba(74, 246, 38, 0.4)';
-    ctx.fillRect(x, y - 14, 120, 18);
-    ctx.fillStyle = 'black';
-    ctx.font = '14px Arial';
-    ctx.fillText(label, x + 4, y - 1);
+    
+    // 1. Wipe clean and draw base PDF
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(offscreenCanvas, 0, 0);
+
+    // 2. Draw all mapped variables
+    if (templateMap && templateMap.fields) {
+        for (const [variableName, coords] of Object.entries(templateMap.fields)) {
+            const htmlX = coords.x * pdfViewport.scale;
+            const htmlY = pdfViewport.height - (coords.y * pdfViewport.scale);
+            
+            ctx.fillStyle = 'rgba(74, 246, 38, 0.5)';
+            ctx.fillRect(htmlX, htmlY - 14, 120, 18);
+            ctx.fillStyle = 'black';
+            ctx.font = '14px Arial';
+            ctx.fillText(variableName, htmlX + 4, htmlY - 1);
+        }
+    }
 }
 
-// Translates PDF coordinates back to HTML canvas coordinates and draws them
-export function loadExistingMap(canvas, pdfViewport, templateMap) {
-    if (!templateMap || !templateMap.fields) return;
-    
+// Checks if the mouse X/Y is currently hovering over an existing marker box
+export function getHoveredField(mouseX, mouseY, pdfViewport, templateMap) {
+    if (!templateMap || !templateMap.fields) return null;
+
     for (const [variableName, coords] of Object.entries(templateMap.fields)) {
         const htmlX = coords.x * pdfViewport.scale;
         const htmlY = pdfViewport.height - (coords.y * pdfViewport.scale);
-        drawMarker(canvas, htmlX, htmlY, variableName);
+
+        // Check if mouse is inside the 120x18 pixel box we drew
+        if (mouseX >= htmlX && mouseX <= htmlX + 120 && 
+            mouseY >= htmlY - 14 && mouseY <= htmlY + 4) {
+            return variableName;
+        }
     }
-}
-
-export function handleCanvasClick(e, pdfViewport, templateMap) {
-    if (!pdfViewport) return;
-
-    const canvas = document.getElementById('pdfCanvas');
-    const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-
-    const pdfX = clickX / pdfViewport.scale;
-    const pdfY = (pdfViewport.height - clickY) / pdfViewport.scale;
-
-    const variableName = prompt("Enter exact variable name (e.g., vendorName, amount, projectName):");
-
-    if (variableName) {
-        templateMap.fields[variableName] = { x: pdfX, y: pdfY, size: 12 };
-        drawMarker(canvas, clickX, clickY, variableName);
-    }
+    return null;
 }
