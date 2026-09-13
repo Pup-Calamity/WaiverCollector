@@ -1,0 +1,57 @@
+import { configurePdfJs, handleCanvasClick } from './templateEditor.js';
+
+let dirHandle;
+const pdfjsLib = configurePdfJs();
+let pdfViewport = null;
+let templateMap = { fields: {} };
+const output = document.getElementById('output');
+
+document.getElementById('connectFolderBtn').addEventListener('click', async () => {
+    try {
+        dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        output.textContent = `Connected: ${dirHandle.name}`;
+        document.getElementById('loadPdfBtn').disabled = false;
+    } catch (error) {
+        output.textContent = `Connection failed: ${error.message}`;
+    }
+});
+
+document.getElementById('loadPdfBtn').addEventListener('click', async () => {
+    try {
+        const [fileHandle] = await window.showOpenFilePicker({ types: [{ accept: { 'application/pdf': ['.pdf'] } }] });
+        const file = await fileHandle.getFile();
+        const arrayBuffer = await file.arrayBuffer();
+
+        const pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
+        const page = await pdfDoc.getPage(1);
+        
+        pdfViewport = page.getViewport({ scale: 1.5 });
+        const canvas = document.getElementById('pdfCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = pdfViewport.width;
+        canvas.height = pdfViewport.height;
+
+        await page.render({ canvasContext: ctx, viewport: pdfViewport }).promise;
+        document.getElementById('saveMapBtn').disabled = false;
+        output.textContent = `Loaded ${file.name}. Click canvas to map variables.`;
+    } catch (error) {
+        alert(`Error loading PDF: ${error.message}`);
+    }
+});
+
+document.getElementById('pdfCanvas').addEventListener('click', (e) => {
+    handleCanvasClick(e, pdfViewport, templateMap);
+});
+
+document.getElementById('saveMapBtn').addEventListener('click', async () => {
+    try {
+        const templatesDir = await dirHandle.getDirectoryHandle('Templates', { create: true });
+        const fileHandle = await templatesDir.getFileHandle('Template_Config.json', { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(JSON.stringify(templateMap, null, 2));
+        await writable.close();
+        alert('Configuration saved to the Templates folder!');
+    } catch (error) {
+        alert(`Save failed: ${error.message}`);
+    }
+});
