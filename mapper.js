@@ -1,34 +1,50 @@
-import { getPdfJsLib, redrawCanvas, getHoveredField } from './templateEditor.js';
+// mapper.js
+import { getPdfJsLib, redrawCanvas, getHoveredItem } from './templateEditor.js';
 
 let dirHandle;
 let pdfViewport = null;
-let templateMap = { fields: {} };
+let templateMap = { fields: {}, coverUps: [] };
 let currentPdfName = "Template"; 
-let offscreenCanvas = null; // Holds the clean PDF image
+let offscreenCanvas = null; 
 
-// State tracking for dragging and undo
 let isDragging = false;
 let dragField = null;
 let hasMoved = false;
-let history = []; 
+let drawStartX = 0;
+let drawStartY = 0;
+
 const output = document.getElementById('output');
+const templateDropdown = document.getElementById('templateDropdown');
+const deleteTemplateBtn = document.getElementById('deleteTemplateBtn');
 
-// Helper to save state before a change
-function saveState() {
-    history.push(JSON.stringify(templateMap.fields));
-    document.getElementById('undoBtn').disabled = false;
-}
+/* --- Folder Connection & Dropdown --- */
+async function refreshTemplateList() {
+    if (!templateDropdown) return;
+    templateDropdown.innerHTML = '<option value="">-- Select a template --</option>';
+    deleteTemplateBtn.disabled = true;
 
-// Helper to handle coordinate conversion
-function updateFieldPosition(e, canvas, fieldName) {
-    const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
+    try {
+        const templatesDir = await dirHandle.getDirectoryHandle('Templates');
+        let foundAny = false;
 
-    const pdfX = clickX / pdfViewport.scale;
-    const pdfY = (pdfViewport.height - clickY) / pdfViewport.scale;
-    templateMap.fields[fieldName].x = pdfX;
-    templateMap.fields[fieldName].y = pdfY;
+        for await (const entry of templatesDir.values()) {
+            if (entry.kind === 'file' && entry.name.endsWith('.pdf')) {
+                foundAny = true;
+                const option = document.createElement('option');
+                option.value = entry.name;
+                option.textContent = entry.name;
+                templateDropdown.appendChild(option);
+            }
+        }
+
+        if (!foundAny) {
+            templateDropdown.innerHTML = '<option value="">-- No templates found --</option>';
+        } else {
+            deleteTemplateBtn.disabled = false;
+        }
+    } catch (err) {
+        templateDropdown.innerHTML = '<option value="">-- No templates found --</option>';
+    }
 }
 
 document.getElementById('connectFolderBtn').addEventListener('click', async () => {
@@ -36,11 +52,35 @@ document.getElementById('connectFolderBtn').addEventListener('click', async () =
         dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
         output.textContent = `Connected: ${dirHandle.name}`;
         document.getElementById('loadPdfBtn').disabled = false;
+        await refreshTemplateList();
     } catch (error) {
         output.textContent = `Connection failed: ${error.message}`;
     }
 });
 
+if (deleteTemplateBtn) {
+    deleteTemplateBtn.addEventListener('click', async () => {
+        const selectedPdf = templateDropdown.value;
+        if (!selectedPdf) return;
+
+        if (confirm(`Delete ${selectedPdf} and its mapping configuration?`)) {
+            try {
+                const templatesDir = await dirHandle.getDirectoryHandle('Templates');
+                await templatesDir.removeEntry(selectedPdf);
+                try {
+                    await templatesDir.removeEntry(selectedPdf.replace('.pdf', '_Config.json'));
+                } catch (e) { console.log("No matching JSON found."); }
+
+                alert(`Deleted ${selectedPdf}.`);
+                await refreshTemplateList();
+            } catch (error) {
+                alert(`Failed to delete: ${error.message}`);
+            }
+        }
+    });
+}
+
+/* --- PDF Loading & Rendering --- */
 document.getElementById('loadPdfBtn').addEventListener('click', async () => {
     try {
         const pdfjsLib = getPdfJsLib();
@@ -60,7 +100,6 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
 
         await page.render({ canvasContext: ctx, viewport: pdfViewport }).promise;
         
-        // Take a snapshot of the clean PDF in an invisible canvas
         offscreenCanvas = document.createElement('canvas');
         offscreenCanvas.width = canvas.width;
         offscreenCanvas.height = canvas.height;
@@ -68,20 +107,18 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
 
         document.getElementById('saveMapBtn').disabled = false;
 
-        // Try to load existing JSON
         try {
             const templatesDir = await dirHandle.getDirectoryHandle('Templates');
             const configName = currentPdfName.replace('.pdf', '_Config.json');
             const configFile = await (await templatesDir.getFileHandle(configName)).getFile();
             templateMap = JSON.parse(await configFile.text());
             
-            // CRITICAL FIX: Ensure the arrays exist even on older saved files
+            // Ensure arrays exist
             if (!templateMap.fields) templateMap.fields = {};
             if (!templateMap.coverUps) templateMap.coverUps = [];
             
             output.textContent = `Loaded existing map for ${currentPdfName}.`;
         } catch (err) {
-            // CRITICAL FIX: Initialize both arrays on a fresh template
             templateMap = { fields: {}, coverUps: [] };
             output.textContent = `Loaded ${currentPdfName}. No existing map found.`;
         }
@@ -92,14 +129,8 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
     }
 });
 
-/* --- NEW: Interactive Mouse Controls --- */
+/* --- Canvas Interaction Logic --- */
 const canvas = document.getElementById('pdfCanvas');
-
-if (!templateMap.fields) templateMap.fields = {};
-if (!templateMap.coverUps) templateMap.coverUps = [];
-
-let drawStartX = 0;
-let drawStartY = 0;
 
 canvas.addEventListener('mousedown', (e) => {
     if (!pdfViewport) return;
@@ -107,18 +138,20 @@ canvas.addEventListener('mousedown', (e) => {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    const currentTool = document.querySelector('input[name="toolMode"]:checked').value;
+    const toolInputs = document.querySelectorAll('input[name="toolMode"]');
+    let currentTool = 'variable';
+    if (toolInputs.length > 0) {
+        currentTool = document.querySelector('input[name="toolMode"]:checked').value;
+    }
     
-    // First, check if we clicked an existing item
     dragField = getHoveredItem(mouseX, mouseY, pdfViewport, templateMap);
     
     if (dragField) {
         isDragging = true;
         hasMoved = false;
     } else if (currentTool === 'coverup') {
-        // If clicking empty space in coverup mode, start drawing a rectangle
         isDragging = true;
-        hasMoved = true; // Force true so it doesn't trigger delete
+        hasMoved = true; 
         dragField = { type: 'drawing_coverup' };
         drawStartX = mouseX;
         drawStartY = mouseY;
@@ -140,17 +173,15 @@ canvas.addEventListener('mousemove', (e) => {
         redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
     } 
     else if (dragField && dragField.type === 'drawing_coverup') {
-        // Redraw base PDF to clear previous frame of the animation
         redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
         
-        // Math to support dragging in any direction
         const boxX = Math.min(drawStartX, mouseX);
         const boxY = Math.min(drawStartY, mouseY);
         const boxW = Math.abs(mouseX - drawStartX);
         const boxH = Math.abs(mouseY - drawStartY);
 
         const ctx = canvas.getContext('2d');
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; // Semi-transparent white while dragging
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
         ctx.fillRect(boxX, boxY, boxW, boxH);
         ctx.strokeStyle = 'red';
         ctx.strokeRect(boxX, boxY, boxW, boxH);
@@ -159,31 +190,30 @@ canvas.addEventListener('mousemove', (e) => {
 
 canvas.addEventListener('mouseup', (e) => {
     if (!pdfViewport) return;
-    const currentTool = document.querySelector('input[name="toolMode"]:checked').value;
+    
+    const toolInputs = document.querySelectorAll('input[name="toolMode"]');
+    let currentTool = 'variable';
+    if (toolInputs.length > 0) {
+        currentTool = document.querySelector('input[name="toolMode"]:checked').value;
+    }
+
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
     if (dragField && dragField.type === 'drawing_coverup') {
-        // Calculate final dimensions regardless of drag direction
         const pixelW = Math.abs(mouseX - drawStartX);
         const pixelH = Math.abs(mouseY - drawStartY);
         
-        if (pixelW > 5 && pixelH > 5) { // Prevent tiny accidental clicks
+        if (pixelW > 5 && pixelH > 5) { 
             const pdfW = pixelW / pdfViewport.scale;
             const pdfH = pixelH / pdfViewport.scale;
-            
-            // X is the leftmost point
             const pdfX = Math.min(drawStartX, mouseX) / pdfViewport.scale;
-            
-            // Y in pdf-lib is from the bottom of the page to the bottom of the rectangle
             const bottomPixelY = Math.max(drawStartY, mouseY); 
             const pdfY = (pdfViewport.height - bottomPixelY) / pdfViewport.scale;
 
-            // Push to the array we guaranteed exists in the load step
             templateMap.coverUps.push({ x: pdfX, y: pdfY, width: pdfW, height: pdfH });
         }
-        // Force a redraw so it locks in the solid white box with red border
         redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
     } 
     else if (dragField && !hasMoved) {
@@ -212,18 +242,6 @@ canvas.addEventListener('mouseup', (e) => {
     
     isDragging = false;
     dragField = null;
-});
-/* --- NEW: Undo Button --- */
-document.getElementById('undoBtn').addEventListener('click', () => {
-    if (history.length > 0) {
-        const previousState = history.pop();
-        templateMap.fields = JSON.parse(previousState);
-        redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
-        
-        if (history.length === 0) {
-            document.getElementById('undoBtn').disabled = true;
-        }
-    }
 });
 
 document.getElementById('saveMapBtn').addEventListener('click', async () => {
