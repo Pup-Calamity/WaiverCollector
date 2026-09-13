@@ -16,7 +16,6 @@
         canvas { border: 2px solid #333; max-width: 100%; cursor: crosshair; display: block; margin-top: 15px; user-select: none; }
         #output { background: #1e1e1e; color: #4af626; padding: 15px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; height: 60px; overflow-y: auto; margin-bottom: 15px; }
         
-        /* New Toolbar Styling */
         .toolbar { margin: 15px 0; padding: 15px; background: #e9ecef; border-radius: 5px; border: 1px solid #ccc; }
         .toolbar label { margin-right: 20px; cursor: pointer; font-size: 16px; font-weight: bold; }
     </style>
@@ -37,13 +36,12 @@
 
     <div class="card">
         <h2>Visual Template Mapper</h2>
-        <button id="connectFolderBtn">1. Connect Master AR Folder</button>
+        <button id="connectFolderBtn">1. Connect / Verify Master AR Folder</button>
         <div id="output">Waiting for folder connection...</div>
         
         <button id="loadPdfBtn" disabled>2. Load PDF to Canvas</button>
         <button id="saveMapBtn" disabled>3. Save JSON Map</button>
         
-        <!-- The New Highly Visible Toolbar -->
         <div class="toolbar">
             <label>
                 <input type="radio" name="toolMode" value="variable" checked> 🟢 Click to Add/Move Variables
@@ -58,6 +56,16 @@
         
         <canvas id="pdfCanvas"></canvas>
     </div>
+
+    <!-- The New Variable Selection Modal -->
+    <dialog id="variableModal" style="padding: 20px; border-radius: 8px; border: 1px solid #ccc; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 300px;">
+        <h3 style="margin-top: 0;">Select Variable</h3>
+        <select id="variableSelect" style="padding: 8px; width: 100%; margin-bottom: 15px;"></select>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button id="cancelVariableBtn" style="background: #ccc; color: black; margin: 0;">Cancel</button>
+            <button id="confirmVariableBtn" style="margin: 0;">Add Variable</button>
+        </div>
+    </dialog>
 
     <script type="module" src="./mapper.js"></script>
 </body>
