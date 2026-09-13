@@ -89,56 +89,112 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
 /* --- NEW: Interactive Mouse Controls --- */
 const canvas = document.getElementById('pdfCanvas');
 
+if (!templateMap.fields) templateMap.fields = {};
+if (!templateMap.coverUps) templateMap.coverUps = [];
+
+let drawStartX = 0;
+let drawStartY = 0;
+
 canvas.addEventListener('mousedown', (e) => {
     if (!pdfViewport) return;
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    dragField = getHoveredField(mouseX, mouseY, pdfViewport, templateMap);
+    const currentTool = document.querySelector('input[name="toolMode"]:checked').value;
+    
+    // First, check if we clicked an existing item
+    dragField = getHoveredItem(mouseX, mouseY, pdfViewport, templateMap);
     
     if (dragField) {
-        // We clicked an existing marker. Prepare to move it.
         isDragging = true;
         hasMoved = false;
+    } else if (currentTool === 'coverup') {
+        // If clicking empty space in coverup mode, start drawing a rectangle
+        isDragging = true;
+        hasMoved = true; // Force true so it doesn't trigger delete
+        dragField = { type: 'drawing_coverup' };
+        drawStartX = mouseX;
+        drawStartY = mouseY;
     }
 });
 
 canvas.addEventListener('mousemove', (e) => {
-    if (isDragging && dragField) {
-        if (!hasMoved) saveState(); // Save state only on the first pixel of movement
+    if (!isDragging) return;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    if (dragField.type === 'variable') {
         hasMoved = true;
-        updateFieldPosition(e, canvas, dragField);
+        const pdfX = mouseX / pdfViewport.scale;
+        const pdfY = (pdfViewport.height - mouseY) / pdfViewport.scale;
+        templateMap.fields[dragField.id].x = pdfX;
+        templateMap.fields[dragField.id].y = pdfY;
         redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
+    } 
+    else if (dragField.type === 'drawing_coverup') {
+        // Render the box dynamically as we drag
+        redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.fillRect(drawStartX, drawStartY, mouseX - drawStartX, mouseY - drawStartY);
+        ctx.strokeStyle = 'red';
+        ctx.strokeRect(drawStartX, drawStartY, mouseX - drawStartX, mouseY - drawStartY);
     }
 });
 
 canvas.addEventListener('mouseup', (e) => {
     if (!pdfViewport) return;
+    const currentTool = document.querySelector('input[name="toolMode"]:checked').value;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
 
-    if (isDragging && dragField) {
-        // If we clicked it but didn't drag it, that means we want to DELETE it.
-        if (!hasMoved) {
-            if (confirm(`Delete the variable '${dragField}'?`)) {
-                saveState();
-                delete templateMap.fields[dragField];
-                redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
-            }
+    if (dragField && dragField.type === 'drawing_coverup') {
+        // Finish drawing the whiteout box and save to PDF coordinates
+        const width = Math.abs(mouseX - drawStartX) / pdfViewport.scale;
+        const height = Math.abs(mouseY - drawStartY) / pdfViewport.scale;
+        const pdfX = Math.min(drawStartX, mouseX) / pdfViewport.scale;
+        
+        // Calculate bottom-left Y coordinate for pdf-lib
+        const topY = Math.min(drawStartY, mouseY);
+        const pdfY = (pdfViewport.height - topY) / pdfViewport.scale - height;
+
+        if (width > 5 && height > 5) { // Prevent tiny accidental clicks
+            templateMap.coverUps.push({ x: pdfX, y: pdfY, width: width, height: height });
         }
-        isDragging = false;
-        dragField = null;
-    } else {
-        // If we clicked empty space, ADD a new variable
-        const variableName = prompt("Enter exact variable name (e.g., vendorName, amount):");
+        redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
+    } 
+    else if (dragField && !hasMoved) {
+        // DELETE LOGIC: We clicked an item but didn't move it.
+        const confirmMsg = dragField.type === 'variable' 
+            ? `Delete variable '${dragField.id}'?` 
+            : `Delete this cover-up box?`;
+            
+        if (confirm(confirmMsg)) {
+            if (dragField.type === 'variable') {
+                delete templateMap.fields[dragField.id];
+            } else if (dragField.type === 'coverup') {
+                templateMap.coverUps.splice(dragField.id, 1);
+            }
+            redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
+        }
+    } 
+    else if (!dragField && currentTool === 'variable') {
+        // Clicked empty space in variable mode -> Add new variable
+        const variableName = prompt("Enter exact variable name:");
         if (variableName) {
-            saveState();
-            templateMap.fields[variableName] = { x: 0, y: 0, size: 12 };
-            updateFieldPosition(e, canvas, variableName);
+            const pdfX = mouseX / pdfViewport.scale;
+            const pdfY = (pdfViewport.height - mouseY) / pdfViewport.scale;
+            templateMap.fields[variableName] = { x: pdfX, y: pdfY, size: 12 };
             redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
         }
     }
+    
+    isDragging = false;
+    dragField = null;
 });
-
 /* --- NEW: Undo Button --- */
 document.getElementById('undoBtn').addEventListener('click', () => {
     if (history.length > 0) {
