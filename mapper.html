@@ -15,7 +15,6 @@
         button:disabled { background: #ccc; cursor: not-allowed; }
         canvas { border: 2px solid #333; max-width: 100%; cursor: crosshair; display: block; margin-top: 15px; user-select: none; }
         #output { background: #1e1e1e; color: #4af626; padding: 15px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; height: 60px; overflow-y: auto; margin-bottom: 15px; }
-        
         .toolbar { margin: 15px 0; padding: 15px; background: #e9ecef; border-radius: 5px; border: 1px solid #ccc; }
         .toolbar label { margin-right: 20px; cursor: pointer; font-size: 16px; font-weight: bold; }
     </style>
@@ -24,40 +23,48 @@
     <nav>
         <a href="index.html">&larr; Back to Processor</a> | 
         <span>Visual Template Mapper</span>
+        <span id="navStatus" style="float: right; color: #28a745; font-weight: bold;"></span>
     </nav>
 
-    <div class="card">
-        <h2>Manage Saved Templates</h2>
-        <select id="templateDropdown" style="padding: 8px; margin-right: 10px;">
-            <option value="">-- Connect folder to load templates --</option>
-        </select>
-        <button id="deleteTemplateBtn" disabled style="background: #dc3545;">Delete Selected Template</button>
+    <!-- The Connection Card -->
+    <div class="card" id="connectionCard">
+        <h2>System Connection</h2>
+        <p>Please connect your local Master AR Folder to continue.</p>
+        <button id="connectFolderBtn">Connect / Verify Master AR Folder</button>
     </div>
 
-    <div class="card">
-        <h2>Visual Template Mapper</h2>
-        <button id="connectFolderBtn">1. Connect / Verify Master AR Folder</button>
-        <div id="output">Waiting for folder connection...</div>
-        
-        <button id="loadPdfBtn" disabled>2. Load PDF to Canvas</button>
-        <button id="saveMapBtn" disabled>3. Save JSON Map</button>
-        
-        <div class="toolbar">
-            <label>
-                <input type="radio" name="toolMode" value="variable" checked> 🟢 Click to Add/Move Variables
-            </label>
-            <label>
-                <input type="radio" name="toolMode" value="coverup"> ⬜ Click & Drag to Draw Whiteout
-            </label>
-            <div style="margin-top: 10px; font-size: 14px; color: #555;">
-                <em>Hint: <strong>Right-Click</strong> any green variable or whiteout box to delete it!</em>
-            </div>
+    <!-- The Workspace (Hidden until connected) -->
+    <div id="mapperWorkspace" style="display: none;">
+        <div class="card">
+            <h2>Manage Saved Templates</h2>
+            <select id="templateDropdown" style="padding: 8px; margin-right: 10px;">
+                <option value="">-- Connect folder to load templates --</option>
+            </select>
+            <button id="deleteTemplateBtn" disabled style="background: #dc3545;">Delete Selected Template</button>
         </div>
-        
-        <canvas id="pdfCanvas"></canvas>
+
+        <div class="card">
+            <h2>Visual Template Mapper</h2>
+            <button id="loadPdfBtn">Load PDF to Canvas</button>
+            <button id="saveMapBtn" disabled>Save JSON Map</button>
+            
+            <div class="toolbar">
+                <label>
+                    <input type="radio" name="toolMode" value="variable" checked> 🟢 Click to Add/Move Variables
+                </label>
+                <label>
+                    <input type="radio" name="toolMode" value="coverup"> ⬜ Click & Drag to Draw Whiteout
+                </label>
+                <div style="margin-top: 10px; font-size: 14px; color: #555;">
+                    <em>Hint: <strong>Right-Click</strong> any green variable or whiteout box to delete it!</em>
+                </div>
+            </div>
+            
+            <div id="output">System Ready. Load a PDF to begin.</div>
+            <canvas id="pdfCanvas"></canvas>
+        </div>
     </div>
 
-    <!-- The New Variable Selection Modal -->
     <dialog id="variableModal" style="padding: 20px; border-radius: 8px; border: 1px solid #ccc; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 300px;">
         <h3 style="margin-top: 0;">Select Variable</h3>
         <select id="variableSelect" style="padding: 8px; width: 100%; margin-bottom: 15px;"></select>
