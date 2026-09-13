@@ -22,19 +22,23 @@
     <nav>
         <span>Waiver Processor</span> | 
         <a href="mapper.html">Visual Template Mapper &rarr;</a>
+        <span id="navStatus" style="float: right; color: #28a745; font-weight: bold;"></span>
     </nav>
 
-    <div class="card">
-        <h2>1. System Connection</h2>
+    <!-- The Connection Card -->
+    <div class="card" id="connectionCard">
+        <h2>System Connection</h2>
+        <p>Please connect your local Master AR Folder to continue.</p>
         <button id="connectFolderBtn">Connect Master AR Folder</button>
-        <div id="output">Waiting for folder connection...</div>
     </div>
 
-    <div class="card">
-        <h2>2. Waiver Processing Engine</h2>
+    <!-- The Workspace (Hidden until connected) -->
+    <div class="card" id="processingWorkspace" style="display: none;">
+        <h2>Waiver Processing Engine</h2>
         <input type="text" id="jobInput" placeholder="Job Number (e.g., 12345)">
         <input type="text" id="vendorInput" placeholder="Vendor Name">
-        <button id="processWaiverBtn" disabled>Generate Waiver & Email Draft</button>
+        <button id="processWaiverBtn">Generate Waiver & Email Draft</button>
+        <div id="output" style="margin-top: 15px;">System Ready. Enter Job and Vendor.</div>
     </div>
 
     <script type="module" src="./app.js"></script>
