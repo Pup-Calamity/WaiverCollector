@@ -1,4 +1,5 @@
 // templateEditor.js
+
 export function getPdfJsLib() {
     if (!window.pdfjsLib) throw new Error("PDF.js is not loaded.");
     window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
@@ -9,15 +10,14 @@ export function redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap) 
     if (!pdfViewport || !offscreenCanvas) return;
     const ctx = canvas.getContext('2d');
     
+    // Wipe clean and draw base PDF
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(offscreenCanvas, 0, 0);
 
-    // Draw Cover-Ups (White with red border so you can see them)
+    // Draw Cover-Ups (White with red border)
     if (templateMap.coverUps) {
         templateMap.coverUps.forEach(box => {
             const htmlX = box.x * pdfViewport.scale;
-            // pdf-lib Y is bottom-up. Canvas Y is top-down. 
-            // We must convert the Y coordinate AND subtract height to draw top-down.
             const htmlY = pdfViewport.height - (box.y * pdfViewport.scale) - (box.height * pdfViewport.scale);
             const htmlW = box.width * pdfViewport.scale;
             const htmlH = box.height * pdfViewport.scale;
@@ -45,7 +45,7 @@ export function redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap) 
 }
 
 export function getHoveredItem(mouseX, mouseY, pdfViewport, templateMap) {
-    // Check variables first
+    // 1. Check variables first
     if (templateMap.fields) {
         for (const [variableName, coords] of Object.entries(templateMap.fields)) {
             const htmlX = coords.x * pdfViewport.scale;
@@ -55,7 +55,7 @@ export function getHoveredItem(mouseX, mouseY, pdfViewport, templateMap) {
             }
         }
     }
-    // Check cover-ups
+    // 2. Check cover-ups
     if (templateMap.coverUps) {
         for (let i = 0; i < templateMap.coverUps.length; i++) {
             const box = templateMap.coverUps[i];
