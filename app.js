@@ -1,6 +1,7 @@
 import { extractVendorData } from './dataParser.js';
 import { stampWaiverWithConfig } from './pdfEngine.js';
 import { initTemplateEditor } from './templateEditor.js';
+import { generateEmlBlob } from './emailEngine.js';
 
 // Global state to hold the directory connection
 let dirHandle;
@@ -64,6 +65,31 @@ document.getElementById('readExcelBtn').addEventListener('click', async () => {
         await writable.close();
 
         outputDiv.textContent += `Success! Stamped and saved as ${saveFileName}.`;
+        
+        // 1. Prepare the email contents
+        const emailConfig = {
+            to: "vendor.contact@example.com",
+            cc: "altmanb@lithko.com",
+            subject: `Monthly Waiver Request - ${vendorData.projectName}`,
+            bodyHTML: `<span style="font-size: 16px; font-family: sans-serif;">
+                           Hello,<br><br>
+                           Could you please process the attached waiver as soon as you can? 
+                           We are expecting the waivers returned shortly.<br><br>
+                           Thank you
+                       </span>`
+        };
+        
+        // 2. Generate the .eml file blob, passing in the stampedPdfBytes we already made
+        const emlBlob = generateEmlBlob(emailConfig, stampedPdfBytes, saveFileName);
+        
+        // 3. Save the .eml file to the local directory
+        const emlFileName = `${vendorData.vendorName}_Waiver_Draft.eml`;
+        const emlFileHandle = await dirHandle.getFileHandle(emlFileName, { create: true });
+        const emlWritable = await emlFileHandle.createWritable();
+        await emlWritable.write(emlBlob);
+        await emlWritable.close();
+        
+        outputDiv.textContent += `\nDraft email saved as ${emlFileName}. Double-click to open in Outlook!`;
 
     } catch (error) {
         console.error(error);
