@@ -1,47 +1,88 @@
 // templateEditor.js
 
-// This object will hold all the mapped coordinates for the current template
-let templateConfig = {
-    templateName: "Frontline_Final.pdf",
-    fields: {}
-};
+export function initTemplateEditor(dirHandle) {
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-export function enableTemplateMapping(canvasElement, pdfHeight) {
-    canvasElement.addEventListener('click', (event) => {
-        // 1. Get the exact click coordinates relative to the canvas
-        const rect = canvasElement.getBoundingClientRect();
-        const clickX = event.clientX - rect.left;
-        const clickY = event.clientY - rect.top;
+    const canvas = document.getElementById('pdfCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let pdfViewport = null;
+    let currentFileName = "";
+    
+    // The master object we will save as JSON
+    let templateMap = { fields: {} };
 
-        // Note: HTML canvas Y-coordinates start at the top, but pdf-lib starts at the bottom.
-        // We invert the Y coordinate here so pdf-lib understands it later.
-        const pdfY = pdfHeight - clickY; 
+    // 1. Load the PDF onto the canvas
+    document.getElementById('loadPdfBtn').addEventListener('click', async () => {
+        try {
+            const [fileHandle] = await window.showOpenFilePicker({
+                types: [{ accept: { 'application/pdf': ['.pdf'] } }]
+            });
+            const file = await fileHandle.getFile();
+            currentFileName = file.name;
 
-        // 2. Prompt the user to assign a variable to this spot
-        // (In the final UI, this would be a clean dropdown menu instead of a basic prompt)
-        const variableName = prompt("Enter variable name (e.g., vendorName, amount, projectName):");
+            const arrayBuffer = await file.arrayBuffer();
+            const pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
+            const page = await pdfDoc.getPage(1);
+            
+            // Render at 1.5x scale for easier clicking
+            pdfViewport = page.getViewport({ scale: 1.5 });
+            canvas.width = pdfViewport.width;
+            canvas.height = pdfViewport.height;
 
-        if (variableName) {
-            // 3. Save the mapping to our configuration object
-            templateConfig.fields[variableName] = {
-                x: clickX,
-                y: pdfY,
-                size: 12, // Default font size
-                font: 'Helvetica'
-            };
-
-            // 4. Draw a visual marker on the screen so you know it's placed
-            drawMarkerOnCanvas(canvasElement, clickX, clickY, variableName);
-            console.log("Current Map:", templateConfig);
+            await page.render({ canvasContext: ctx, viewport: pdfViewport }).promise;
+            document.getElementById('saveMapBtn').disabled = false;
+            console.log("PDF loaded. Click anywhere to map a variable.");
+        } catch (error) {
+            console.error("Error loading PDF to canvas:", error);
         }
     });
-}
 
-function drawMarkerOnCanvas(canvas, x, y, label) {
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'rgba(74, 246, 38, 0.5)'; // Bright green highlighter
-    ctx.fillRect(x, y - 10, 100, 15);
-    ctx.fillStyle = 'black';
-    ctx.font = '10px Arial';
-    ctx.fillText(label, x + 2, y);
+    // 2. Capture clicks and map variables
+    canvas.addEventListener('click', (e) => {
+        if (!pdfViewport) return;
+
+        // Get exact click coordinates relative to the canvas
+        const rect = canvas.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
+
+        // CRITICAL: Convert HTML canvas coordinates to PDF coordinates
+        // HTML starts top-left. PDF-lib starts bottom-left. We also reverse the 1.5x scale.
+        const pdfX = clickX / pdfViewport.scale;
+        const pdfY = (pdfViewport.height - clickY) / pdfViewport.scale;
+
+        const variableName = prompt("Enter exact variable name (e.g., vendorName, amount, projectName):");
+
+        if (variableName) {
+            templateMap.fields[variableName] = { x: pdfX, y: pdfY, size: 12 };
+
+            // Draw a visual highlighter box on the canvas
+            ctx.fillStyle = 'rgba(74, 246, 38, 0.4)'; // Transparent green
+            ctx.fillRect(clickX, clickY - 14, 120, 18);
+            ctx.fillStyle = 'black';
+            ctx.font = '14px Arial';
+            ctx.fillText(variableName, clickX + 4, clickY - 1);
+        }
+    });
+
+    // 3. Save the JSON file to the Templates folder
+    document.getElementById('saveMapBtn').addEventListener('click', async () => {
+        try {
+            const templatesDir = await dirHandle.getDirectoryHandle('Templates', { create: true });
+            
+            // Name the config file to match the PDF (e.g., Waiver.pdf -> Waiver_Config.json)
+            const jsonFileName = currentFileName.replace('.pdf', '_Config.json');
+            const fileHandle = await templatesDir.getFileHandle(jsonFileName, { create: true });
+            
+            const writable = await fileHandle.createWritable();
+            await writable.write(JSON.stringify(templateMap, null, 2));
+            await writable.close();
+
+            alert(`Template map saved as ${jsonFileName}`);
+        } catch (error) {
+            console.error("Failed to save map:", error);
+        }
+    });
 }
