@@ -74,9 +74,15 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
             const configName = currentPdfName.replace('.pdf', '_Config.json');
             const configFile = await (await templatesDir.getFileHandle(configName)).getFile();
             templateMap = JSON.parse(await configFile.text());
+            
+            // CRITICAL FIX: Ensure the arrays exist even on older saved files
+            if (!templateMap.fields) templateMap.fields = {};
+            if (!templateMap.coverUps) templateMap.coverUps = [];
+            
             output.textContent = `Loaded existing map for ${currentPdfName}.`;
         } catch (err) {
-            templateMap = { fields: {} };
+            // CRITICAL FIX: Initialize both arrays on a fresh template
+            templateMap = { fields: {}, coverUps: [] };
             output.textContent = `Loaded ${currentPdfName}. No existing map found.`;
         }
         
