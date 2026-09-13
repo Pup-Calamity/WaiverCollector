@@ -1,59 +1,39 @@
-import { getPdfJsLib, handleCanvasClick } from './templateEditor.js';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WaiverIO - Template Mapper</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+        nav { margin-bottom: 20px; font-weight: bold; }
+        nav a { margin-right: 15px; color: #0056b3; text-decoration: none; }
+        nav a:hover { text-decoration: underline; }
+        .card { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        button { padding: 10px 15px; cursor: pointer; margin: 5px 5px 15px 0; background: #0056b3; color: white; border: none; border-radius: 4px; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        canvas { border: 2px solid #333; max-width: 100%; cursor: crosshair; display: block; margin-top: 15px; }
+        #output { background: #1e1e1e; color: #4af626; padding: 15px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; height: 60px; overflow-y: auto; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="index.html">&larr; Back to Processor</a> | 
+        <span>Visual Template Mapper</span>
+    </nav>
 
-let dirHandle;
-let pdfViewport = null;
-let templateMap = { fields: {} };
-const output = document.getElementById('output');
-
-document.getElementById('connectFolderBtn').addEventListener('click', async () => {
-    try {
-        dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-        output.textContent = `Connected: ${dirHandle.name}`;
-        document.getElementById('loadPdfBtn').disabled = false;
-    } catch (error) {
-        output.textContent = `Connection failed: ${error.message}`;
-    }
-});
-
-document.getElementById('loadPdfBtn').addEventListener('click', async () => {
-    try {
-        // Initialize PDF.js safely after the click
-        const pdfjsLib = getPdfJsLib();
-
-        const [fileHandle] = await window.showOpenFilePicker({ types: [{ accept: { 'application/pdf': ['.pdf'] } }] });
-        const file = await fileHandle.getFile();
-        const arrayBuffer = await file.arrayBuffer();
-
-        const pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
-        const page = await pdfDoc.getPage(1);
+    <div class="card">
+        <h2>Visual Template Mapper</h2>
+        <button id="connectFolderBtn">1. Connect Master AR Folder</button>
+        <div id="output">Waiting for folder connection...</div>
         
-        pdfViewport = page.getViewport({ scale: 1.5 });
-        const canvas = document.getElementById('pdfCanvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = pdfViewport.width;
-        canvas.height = pdfViewport.height;
+        <button id="loadPdfBtn" disabled>2. Load PDF to Canvas</button>
+        <button id="saveMapBtn" disabled>3. Save JSON Map</button>
+        
+        <canvas id="pdfCanvas"></canvas>
+    </div>
 
-        await page.render({ canvasContext: ctx, viewport: pdfViewport }).promise;
-        document.getElementById('saveMapBtn').disabled = false;
-        output.textContent = `Loaded ${file.name}. Click canvas to map variables.`;
-    } catch (error) {
-        alert(`Error loading PDF: ${error.message}`);
-    }
-});
-
-document.getElementById('pdfCanvas').addEventListener('click', (e) => {
-    handleCanvasClick(e, pdfViewport, templateMap);
-});
-
-document.getElementById('saveMapBtn').addEventListener('click', async () => {
-    try {
-        const templatesDir = await dirHandle.getDirectoryHandle('Templates', { create: true });
-        const fileHandle = await templatesDir.getFileHandle('Template_Config.json', { create: true });
-        const writable = await fileHandle.createWritable();
-        await writable.write(JSON.stringify(templateMap, null, 2));
-        await writable.close();
-        alert('Configuration saved to the Templates folder!');
-    } catch (error) {
-        alert(`Save failed: ${error.message}`);
-    }
-});
+    <script type="module" src="./mapper.js"></script>
+</body>
+</html>
