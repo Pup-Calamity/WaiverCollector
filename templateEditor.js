@@ -1,7 +1,10 @@
-export function configurePdfJs() {
-    const pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-    return pdfjsLib;
+export function getPdfJsLib() {
+    if (!window.pdfjsLib) {
+        throw new Error("PDF.js is not loaded. Check the CDN script tag in your HTML.");
+    }
+    // Configure the background worker only when requested
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    return window.pdfjsLib;
 }
 
 export function handleCanvasClick(e, pdfViewport, templateMap) {
