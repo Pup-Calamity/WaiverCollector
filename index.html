@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WaiverIO</title>
@@ -14,6 +15,16 @@
 <body>
     <h2>Waiver Management Engine</h2>
     <button id="folderBtn">1. Connect Master AR Folder</button>
+
+    <div class="action-group">
+        <strong>Visual Template Mapper</strong><br><br>
+        <button id="loadPdfBtn">1. Load PDF to Canvas</button>
+        <button id="saveMapBtn" disabled>2. Save JSON Map</button>
+        
+        <div style="margin-top: 15px; border: 1px solid #ccc; display: inline-block;">
+            <canvas id="pdfCanvas" style="cursor: crosshair;"></canvas>
+        </div>
+    </div>
     
     <div class="action-group">
         <strong>Template Manager</strong><br><br>
