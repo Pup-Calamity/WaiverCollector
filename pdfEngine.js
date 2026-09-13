@@ -1,33 +1,27 @@
 // pdfEngine.js
 
-export async function stampWaiver(pdfArrayBuffer, vendorData) {
-    // Load the raw PDF buffer into pdf-lib
+export async function stampWaiverWithConfig(pdfArrayBuffer, vendorData, configJson) {
+    // Load the blank PDF template
     const pdfDoc = await PDFLib.PDFDocument.load(pdfArrayBuffer);
     const pages = pdfDoc.getPages();
-    const firstPage = pages[0]; // Assuming a 1-page waiver template
+    const firstPage = pages[0]; 
 
-    // Draw text at specific X/Y coordinates (Origin is bottom-left)
-    // You will tweak these coordinates based on your specific GC template
-    
-    firstPage.drawText(vendorData.projectName, {
-        x: 120,
-        y: 700,
-        size: 12,
-        color: PDFLib.rgb(0, 0, 0)
-    });
+    // Loop through every field defined in the JSON configuration
+    for (const [variableName, coordinates] of Object.entries(configJson.fields)) {
+        
+        // Check if the current vendor data has a matching value for this variable
+        if (vendorData[variableName]) {
+            
+            // Stamp the value at the exact X/Y coordinates from the visual editor
+            firstPage.drawText(String(vendorData[variableName]), {
+                x: coordinates.x,
+                y: coordinates.y,
+                size: coordinates.size || 12,
+                color: PDFLib.rgb(0, 0, 0) // Standard black text
+            });
+        }
+    }
 
-    firstPage.drawText(vendorData.vendorName, {
-        x: 120,
-        y: 675,
-        size: 12,
-    });
-
-    firstPage.drawText(`$${vendorData.amount}`, {
-        x: 400,
-        y: 675,
-        size: 12,
-    });
-
-    // Serialize the document back to raw bytes
+    // Return the finished PDF as a byte array for saving
     return await pdfDoc.save();
 }
