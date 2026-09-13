@@ -1,4 +1,5 @@
 // mapper.js
+import { get, set } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
 import { getPdfJsLib, redrawCanvas, getHoveredItem } from './templateEditor.js';
 
 let dirHandle;
@@ -13,11 +14,40 @@ let hasMoved = false;
 let drawStartX = 0;
 let drawStartY = 0;
 
+// Default list in case the variables.json file gets deleted
+let availableVariables = ["vendorName", "amount", "projectName", "contractDate"]; 
+
 const output = document.getElementById('output');
 const templateDropdown = document.getElementById('templateDropdown');
 const deleteTemplateBtn = document.getElementById('deleteTemplateBtn');
 
-/* --- Folder Connection & Dropdown --- */
+/* --- Folder Connection & Persistence --- */
+async function verifyPermission(fileHandle) {
+    if ((await fileHandle.queryPermission({ mode: 'readwrite' })) === 'granted') return true;
+    if ((await fileHandle.requestPermission({ mode: 'readwrite' })) === 'granted') return true;
+    return false;
+}
+
+// Scans the Data folder for variables.json. If it doesn't exist, it builds it.
+async function loadVariablesList() {
+    try {
+        const dataDir = await dirHandle.getDirectoryHandle('Data', { create: true });
+        const varFile = await dataDir.getFileHandle('variables.json', { create: true });
+        const file = await varFile.getFile();
+        const text = await file.text();
+        
+        if (text.trim() !== '') {
+            availableVariables = JSON.parse(text);
+        } else {
+            const writable = await varFile.createWritable();
+            await writable.write(JSON.stringify(availableVariables, null, 2));
+            await writable.close();
+        }
+    } catch (e) {
+        console.error("Failed to load variables.json. Using defaults.", e);
+    }
+}
+
 async function refreshTemplateList() {
     if (!templateDropdown) return;
     templateDropdown.innerHTML = '<option value="">-- Select a template --</option>';
@@ -26,7 +56,6 @@ async function refreshTemplateList() {
     try {
         const templatesDir = await dirHandle.getDirectoryHandle('Templates');
         let foundAny = false;
-
         for await (const entry of templatesDir.values()) {
             if (entry.kind === 'file' && entry.name.endsWith('.pdf')) {
                 foundAny = true;
@@ -36,23 +65,38 @@ async function refreshTemplateList() {
                 templateDropdown.appendChild(option);
             }
         }
-
-        if (!foundAny) {
-            templateDropdown.innerHTML = '<option value="">-- No templates found --</option>';
-        } else {
-            deleteTemplateBtn.disabled = false;
-        }
+        if (!foundAny) templateDropdown.innerHTML = '<option value="">-- No templates found --</option>';
+        else deleteTemplateBtn.disabled = false;
     } catch (err) {
         templateDropdown.innerHTML = '<option value="">-- No templates found --</option>';
     }
 }
 
+async function setupDirectory(handle) {
+    dirHandle = handle;
+    output.textContent = `Connected: ${dirHandle.name}`;
+    document.getElementById('loadPdfBtn').disabled = false;
+    await refreshTemplateList();
+    await loadVariablesList(); // Load the JSON variables list
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+    const storedHandle = await get('masterARFolder');
+    if (storedHandle && (await storedHandle.queryPermission({ mode: 'readwrite' })) === 'granted') {
+        await setupDirectory(storedHandle);
+    }
+});
+
 document.getElementById('connectFolderBtn').addEventListener('click', async () => {
     try {
-        dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-        output.textContent = `Connected: ${dirHandle.name}`;
-        document.getElementById('loadPdfBtn').disabled = false;
-        await refreshTemplateList();
+        const storedHandle = await get('masterARFolder');
+        if (storedHandle && await verifyPermission(storedHandle)) {
+            await setupDirectory(storedHandle);
+            return;
+        }
+        const newHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        await set('masterARFolder', newHandle);
+        await setupDirectory(newHandle);
     } catch (error) {
         output.textContent = `Connection failed: ${error.message}`;
     }
@@ -67,20 +111,15 @@ if (deleteTemplateBtn) {
             try {
                 const templatesDir = await dirHandle.getDirectoryHandle('Templates');
                 await templatesDir.removeEntry(selectedPdf);
-                try {
-                    await templatesDir.removeEntry(selectedPdf.replace('.pdf', '_Config.json'));
-                } catch (e) { console.log("No matching JSON found."); }
-
+                try { await templatesDir.removeEntry(selectedPdf.replace('.pdf', '_Config.json')); } catch(e){}
                 alert(`Deleted ${selectedPdf}.`);
                 await refreshTemplateList();
-            } catch (error) {
-                alert(`Failed to delete: ${error.message}`);
-            }
+            } catch (error) { alert(`Failed to delete: ${error.message}`); }
         }
     });
 }
 
-/* --- PDF Loading & Rendering --- */
+/* --- PDF Loading (Remains the same) --- */
 document.getElementById('loadPdfBtn').addEventListener('click', async () => {
     try {
         const pdfjsLib = getPdfJsLib();
@@ -113,10 +152,8 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
             const configFile = await (await templatesDir.getFileHandle(configName)).getFile();
             templateMap = JSON.parse(await configFile.text());
             
-            // Ensure arrays exist
             if (!templateMap.fields) templateMap.fields = {};
             if (!templateMap.coverUps) templateMap.coverUps = [];
-            
             output.textContent = `Loaded existing map for ${currentPdfName}.`;
         } catch (err) {
             templateMap = { fields: {}, coverUps: [] };
@@ -124,34 +161,71 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
         }
         
         redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
-    } catch (error) {
-        alert(`Error loading PDF: ${error.message}`);
-    }
+    } catch (error) { alert(`Error loading PDF: ${error.message}`); }
 });
 
-/* --- Canvas Interaction Logic --- */
+/* --- Custom Variable Selection Modal --- */
+function openVariableModal() {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('variableModal');
+        const select = document.getElementById('variableSelect');
+        const confirmBtn = document.getElementById('confirmVariableBtn');
+        const cancelBtn = document.getElementById('cancelVariableBtn');
+
+        // Populate the dropdown with the array loaded from Data/variables.json
+        select.innerHTML = availableVariables.map(v => `<option value="${v}">${v}</option>`).join('');
+        modal.showModal();
+
+        const onConfirm = () => { cleanup(); resolve(select.value); };
+        const onCancel = () => { cleanup(); resolve(null); };
+        
+        const cleanup = () => {
+            confirmBtn.removeEventListener('click', onConfirm);
+            cancelBtn.removeEventListener('click', onCancel);
+            modal.close();
+        };
+
+        confirmBtn.addEventListener('click', onConfirm);
+        cancelBtn.addEventListener('click', onCancel);
+    });
+}
+
+/* --- Canvas Mouse Controls --- */
 const canvas = document.getElementById('pdfCanvas');
 
-canvas.addEventListener('mousedown', (e) => {
+canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault(); 
     if (!pdfViewport) return;
+
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    const toolInputs = document.querySelectorAll('input[name="toolMode"]');
-    let currentTool = 'variable';
-    if (toolInputs.length > 0) {
-        currentTool = document.querySelector('input[name="toolMode"]:checked').value;
+    const target = getHoveredItem(mouseX, mouseY, pdfViewport, templateMap);
+    if (target) {
+        const name = target.type === 'variable' ? `'${target.id}'` : 'this whiteout box';
+        if (confirm(`Delete ${name}?`)) {
+            if (target.type === 'variable') delete templateMap.fields[target.id];
+            else templateMap.coverUps.splice(target.id, 1);
+            redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
+        }
     }
-    
+});
+
+canvas.addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || !pdfViewport) return; 
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const currentTool = document.querySelector('input[name="toolMode"]:checked').value;
     dragField = getHoveredItem(mouseX, mouseY, pdfViewport, templateMap);
     
-    if (dragField) {
+    if (dragField && dragField.type === 'variable') {
         isDragging = true;
         hasMoved = false;
     } else if (currentTool === 'coverup') {
         isDragging = true;
-        hasMoved = true; 
         dragField = { type: 'drawing_coverup' };
         drawStartX = mouseX;
         drawStartY = mouseY;
@@ -183,20 +257,16 @@ canvas.addEventListener('mousemove', (e) => {
         const ctx = canvas.getContext('2d');
         ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
         ctx.fillRect(boxX, boxY, boxW, boxH);
-        ctx.strokeStyle = 'red';
+        ctx.strokeStyle = '#dc3545';
+        ctx.lineWidth = 2;
         ctx.strokeRect(boxX, boxY, boxW, boxH);
     }
 });
 
-canvas.addEventListener('mouseup', (e) => {
-    if (!pdfViewport) return;
-    
-    const toolInputs = document.querySelectorAll('input[name="toolMode"]');
-    let currentTool = 'variable';
-    if (toolInputs.length > 0) {
-        currentTool = document.querySelector('input[name="toolMode"]:checked').value;
-    }
-
+// Changed to async to support awaiting the new Modal Promise
+canvas.addEventListener('mouseup', async (e) => {
+    if (e.button !== 0 || !pdfViewport) return;
+    const currentTool = document.querySelector('input[name="toolMode"]:checked').value;
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
@@ -216,22 +286,10 @@ canvas.addEventListener('mouseup', (e) => {
         }
         redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
     } 
-    else if (dragField && !hasMoved) {
-        const confirmMsg = dragField.type === 'variable' 
-            ? `Delete variable '${dragField.id}'?` 
-            : `Delete this cover-up box?`;
-            
-        if (confirm(confirmMsg)) {
-            if (dragField.type === 'variable') {
-                delete templateMap.fields[dragField.id];
-            } else if (dragField.type === 'coverup') {
-                templateMap.coverUps.splice(dragField.id, 1);
-            }
-            redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
-        }
-    } 
-    else if (!dragField && currentTool === 'variable') {
-        const variableName = prompt("Enter exact variable name:");
+    else if (!dragField && currentTool === 'variable' && !hasMoved) {
+        // Halt code execution, open the modal, and wait for the user to make a choice
+        const variableName = await openVariableModal();
+        
         if (variableName) {
             const pdfX = mouseX / pdfViewport.scale;
             const pdfY = (pdfViewport.height - mouseY) / pdfViewport.scale;
@@ -242,6 +300,7 @@ canvas.addEventListener('mouseup', (e) => {
     
     isDragging = false;
     dragField = null;
+    hasMoved = false;
 });
 
 document.getElementById('saveMapBtn').addEventListener('click', async () => {
@@ -253,7 +312,5 @@ document.getElementById('saveMapBtn').addEventListener('click', async () => {
         await writable.write(JSON.stringify(templateMap, null, 2));
         await writable.close();
         alert(`Configuration saved as ${configName}!`);
-    } catch (error) {
-        alert(`Save failed: ${error.message}`);
-    }
+    } catch (error) { alert(`Save failed: ${error.message}`); }
 });
