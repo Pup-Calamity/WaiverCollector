@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WaiverIO</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        button { padding: 10px 20px; cursor: pointer; }
+        ul { background: #f4f4f4; padding: 20px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h2>Local Folder Connection</h2>
+    <button id="folderBtn">Select Waiver Folder</button>
+    <ul id="fileList"></ul>
+
+    <script>
+        document.getElementById('folderBtn').addEventListener('click', async () => {
+            try {
+                // Request access to a local directory
+                const dirHandle = await window.showDirectoryPicker();
+                
+                const list = document.getElementById('fileList');
+                list.innerHTML = ''; // Clear the list on new selection
+
+                // Iterate through the directory and list files
+                for await (const entry of dirHandle.values()) {
+                    const li = document.createElement('li');
+                    li.textContent = entry.kind === 'file' ? `📄 ${entry.name}` : `📁 ${entry.name}`;
+                    list.appendChild(li);
+                }
+            } catch (error) {
+                console.error("Folder selection cancelled or failed:", error);
+            }
+        });
+    </script>
+</body>
+</html>
