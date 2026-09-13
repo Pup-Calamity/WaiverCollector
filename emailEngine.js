@@ -1,6 +1,3 @@
-// emailEngine.js
-
-// Helper function to convert raw PDF bytes into a Base64 string
 function bufferToBase64(buffer) {
     let binary = '';
     const bytes = new Uint8Array(buffer);
@@ -14,7 +11,6 @@ export function generateEmlBlob(emailData, pdfBuffer, pdfFileName) {
     const base64Pdf = bufferToBase64(pdfBuffer);
     const boundary = "----=_Part_Boundary_" + Date.now();
 
-    // Construct the exact MIME structure required for Outlook
     const emlString = [
         `X-Unsent: 1`,
         `From: waivers@lithko.com`,
@@ -39,6 +35,5 @@ export function generateEmlBlob(emailData, pdfBuffer, pdfFileName) {
         `--${boundary}--`
     ].join('\r\n');
 
-    // Return as a Blob ready to be saved by the File System Access API
     return new Blob([emlString], { type: 'message/rfc822' });
 }
