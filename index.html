@@ -4,25 +4,42 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WaiverIO</title>
+    <!-- Global Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    
     <style>
-        body { font-family: sans-serif; padding: 20px; }
-        button { padding: 10px 20px; font-size: 14px; cursor: pointer; margin-right: 10px; margin-bottom: 10px; }
-        .action-group { margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px; background: #f9f9f9; }
-        canvas { border: 2px solid #333; margin-top: 20px; max-width: 100%; cursor: crosshair; }
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+        .card { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        button { padding: 10px 15px; cursor: pointer; margin: 5px 5px 15px 0; background: #0056b3; color: white; border: none; border-radius: 4px; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        input { padding: 8px; margin: 0 10px 10px 0; }
+        canvas { border: 2px solid #333; max-width: 100%; cursor: crosshair; display: block; }
+        #output { background: #1e1e1e; color: #4af626; padding: 15px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; height: 150px; overflow-y: auto; }
     </style>
 </head>
 <body>
-    <h2>Visual Template Mapper</h2>
-    
-    <div class="action-group">
-        <button id="loadPdfBtn">1. Load PDF to Canvas</button>
-        <button id="saveMapBtn" disabled>2. Save JSON Map</button>
-        <br>
+    <div class="card">
+        <h2>1. System Connection</h2>
+        <button id="connectFolderBtn">Connect Master AR Folder</button>
+        <div id="output">Waiting for folder connection...</div>
+    </div>
+
+    <div class="card">
+        <h2>2. Waiver Processing Engine</h2>
+        <input type="text" id="jobInput" placeholder="Job Number (e.g., 12345)">
+        <input type="text" id="vendorInput" placeholder="Vendor Name">
+        <button id="processWaiverBtn" disabled>Generate Waiver & Email Draft</button>
+    </div>
+
+    <div class="card">
+        <h2>3. Visual Template Mapper</h2>
+        <button id="loadPdfBtn" disabled>Load PDF to Canvas</button>
+        <button id="saveMapBtn" disabled>Save JSON Map</button>
         <canvas id="pdfCanvas"></canvas>
     </div>
 
-    <!-- Explicitly load the app controller as a module -->
     <script type="module" src="./app.js"></script>
 </body>
 </html>
