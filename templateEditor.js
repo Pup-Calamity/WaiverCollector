@@ -1,7 +1,8 @@
 // templateEditor.js
 
 export function initTemplateEditor(dirHandle) {
-    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    // Add this resilient fallback for the PDF.js global variable
+    const pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
     const canvas = document.getElementById('pdfCanvas');
