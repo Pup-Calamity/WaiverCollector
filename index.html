@@ -4,87 +4,64 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WaiverIO</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         body { font-family: sans-serif; padding: 20px; }
         button { padding: 10px 20px; margin-right: 10px; margin-bottom: 10px; cursor: pointer; }
         #output { background: #1e1e1e; color: #4af626; padding: 20px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; height: 150px; overflow-y: auto; }
-        
-        /* Keep the template permanently hidden from the user interface */
-        #waiverTemplate { display: none; }
+        .action-group { margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px; background: #f9f9f9; }
     </style>
 </head>
 <body>
-    <h2>PDF Generation Engine</h2>
-    <button id="folderBtn">1. Connect Folder (Requires Edit Access)</button>
-    <button id="generatePdfBtn" disabled>2. Generate & Save PDF</button>
+    <h2>Waiver Management Engine</h2>
+    <button id="folderBtn">1. Connect Master AR Folder</button>
+    
+    <div class="action-group">
+        <strong>Template Manager</strong><br><br>
+        <button id="uploadTemplateBtn" disabled>Upload New PDF Template</button>
+    </div>
     
     <p><strong>Console:</strong></p>
     <div id="output">Waiting for folder connection...</div>
 
-    <!-- The actual waiver layout -->
-    <div id="waiverTemplate">
-        <h1 style="text-align: center;">CONDITIONAL WAIVER AND RELEASE</h1>
-        <p><strong>Project:</strong> <span id="tpl-project"></span></p>
-        <p><strong>Vendor:</strong> <span id="tpl-vendor"></span></p>
-        <p><strong>Amount:</strong> $<span id="tpl-amount"></span></p>
-        <p>Upon receipt by the undersigned of a check in the above referenced Payment Amount payable to the undersigned, and when the check has been properly endorsed and has been paid by the bank, this document becomes effective...</p>
-    </div>
-
     <script>
         let dirHandle;
-        
-        const extractedData = {
-            project: "Red River Gorge Visitor Center", 
-            vendor: "Acme Concrete",
-            amount: "45,000.00"
-        };
 
+        // 1. Connect to the master folder
         document.getElementById('folderBtn').addEventListener('click', async () => {
             try {
                 dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' }); 
-                document.getElementById('output').textContent = `Connected to: ${dirHandle.name}\nReady to generate document.`;
-                document.getElementById('generatePdfBtn').disabled = false;
+                document.getElementById('output').textContent = `Connected to: ${dirHandle.name}\nReady for operations.`;
+                document.getElementById('uploadTemplateBtn').disabled = false;
             } catch (error) {
                 document.getElementById('output').textContent = "Folder connection failed.";
             }
         });
 
-        document.getElementById('generatePdfBtn').addEventListener('click', async () => {
+        // 2. Upload and store a new template
+        document.getElementById('uploadTemplateBtn').addEventListener('click', async () => {
             try {
                 const outputDiv = document.getElementById('output');
-                outputDiv.textContent = "Injecting data and rendering PDF...\n";
+                
+                // Prompt user to select a PDF file from anywhere on their computer
+                const [fileHandle] = await window.showOpenFilePicker({
+                    types: [{ description: 'PDF Templates', accept: { 'application/pdf': ['.pdf'] } }]
+                });
+                const file = await fileHandle.getFile();
+                outputDiv.textContent = `Selected template: ${file.name}\nCreating Templates subfolder...`;
 
-                // 1. Inject data into the hidden DOM
-                document.getElementById('tpl-project').textContent = extractedData.project;
-                document.getElementById('tpl-vendor').textContent = extractedData.vendor;
-                document.getElementById('tpl-amount').textContent = extractedData.amount;
+                // Get or create the "Templates" subfolder inside the connected AR folder
+                const templatesDir = await dirHandle.getDirectoryHandle('Templates', { create: true });
 
-                // 2. Extract the raw HTML string and wrap it in a styled container for the PDF engine
-                const rawHTML = document.getElementById('waiverTemplate').innerHTML;
-                const pdfString = `<div style="padding: 40px; font-family: 'Times New Roman', serif; color: black; background: white;">${rawHTML}</div>`;
-
-                const pdfOptions = {
-                    margin:       1,
-                    filename:     'Waiver.pdf',
-                    image:        { type: 'jpeg', quality: 0.98 },
-                    html2canvas:  { scale: 2 },
-                    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-                };
-
-                // 3. Render directly from the HTML string
-                const pdfBlob = await html2pdf().set(pdfOptions).from(pdfString).output('blob');
-
-                // 4. Save to folder
-                const newFileHandle = await dirHandle.getFileHandle(`${extractedData.vendor}_Waiver.pdf`, { create: true });
+                // Create a new file inside the Templates subfolder and write the PDF data to it
+                const newFileHandle = await templatesDir.getFileHandle(file.name, { create: true });
                 const writable = await newFileHandle.createWritable();
-                await writable.write(pdfBlob);
+                await writable.write(file);
                 await writable.close();
 
-                outputDiv.textContent += `\nSuccess! ${extractedData.vendor}_Waiver.pdf saved.`;
+                outputDiv.textContent += `\nSuccess! Template saved to /Templates/${file.name}`;
 
             } catch (error) {
-                document.getElementById('output').textContent = `Error saving PDF: ${error.message}`;
+                document.getElementById('output').textContent = `Upload failed: ${error.message}`;
             }
         });
     </script>
