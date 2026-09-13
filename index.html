@@ -4,16 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WaiverIO</title>
-    <!-- Load html2pdf for PDF Generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         body { font-family: sans-serif; padding: 20px; }
         button { padding: 10px 20px; margin-right: 10px; margin-bottom: 10px; cursor: pointer; }
         #output { background: #1e1e1e; color: #4af626; padding: 20px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; height: 150px; overflow-y: auto; }
         
-        /* The hidden HTML template replicating your Word document */
-        #waiverTemplate { display: none; padding: 40px; font-family: 'Times New Roman', serif; }
-        .visible-template { display: block !important; position: absolute; left: -9999px; } /* Rendered off-screen for the PDF engine */
+        /* Keep the template permanently hidden from the user interface */
+        #waiverTemplate { display: none; }
     </style>
 </head>
 <body>
@@ -36,7 +34,6 @@
     <script>
         let dirHandle;
         
-        // Hardcoded dummy data mimicking what we just extracted from SheetJS
         const extractedData = {
             project: "Red River Gorge Visitor Center", 
             vendor: "Acme Concrete",
@@ -45,7 +42,6 @@
 
         document.getElementById('folderBtn').addEventListener('click', async () => {
             try {
-                // Request READWRITE access so we can save the PDF back to the drive
                 dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' }); 
                 document.getElementById('output').textContent = `Connected to: ${dirHandle.name}\nReady to generate document.`;
                 document.getElementById('generatePdfBtn').disabled = false;
@@ -59,15 +55,15 @@
                 const outputDiv = document.getElementById('output');
                 outputDiv.textContent = "Injecting data and rendering PDF...\n";
 
-                // 1. Inject data into the HTML template (Replaces your VBA Find/Replace loop)
+                // 1. Inject data into the hidden DOM
                 document.getElementById('tpl-project').textContent = extractedData.project;
                 document.getElementById('tpl-vendor').textContent = extractedData.vendor;
                 document.getElementById('tpl-amount').textContent = extractedData.amount;
 
-                const templateElement = document.getElementById('waiverTemplate');
-                templateElement.classList.add('visible-template'); 
+                // 2. Extract the raw HTML string and wrap it in a styled container for the PDF engine
+                const rawHTML = document.getElementById('waiverTemplate').innerHTML;
+                const pdfString = `<div style="padding: 40px; font-family: 'Times New Roman', serif; color: black; background: white;">${rawHTML}</div>`;
 
-                // 2. Configure the PDF parameters
                 const pdfOptions = {
                     margin:       1,
                     filename:     'Waiver.pdf',
@@ -76,17 +72,16 @@
                     jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
                 };
 
-                // 3. Render the HTML into a raw PDF Blob in memory
-                const pdfBlob = await html2pdf().set(pdfOptions).from(templateElement).output('blob');
-                templateElement.classList.remove('visible-template');
+                // 3. Render directly from the HTML string
+                const pdfBlob = await html2pdf().set(pdfOptions).from(pdfString).output('blob');
 
-                // 4. Save that Blob directly back to the selected local folder
+                // 4. Save to folder
                 const newFileHandle = await dirHandle.getFileHandle(`${extractedData.vendor}_Waiver.pdf`, { create: true });
                 const writable = await newFileHandle.createWritable();
                 await writable.write(pdfBlob);
                 await writable.close();
 
-                outputDiv.textContent += `\nSuccess! ${extractedData.vendor}_Waiver.pdf saved directly to your folder.`;
+                outputDiv.textContent += `\nSuccess! ${extractedData.vendor}_Waiver.pdf saved.`;
 
             } catch (error) {
                 document.getElementById('output').textContent = `Error saving PDF: ${error.message}`;
