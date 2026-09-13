@@ -1,32 +1,72 @@
-// app.js
-import { stampWaiver } from './pdfEngine.js';
+import { extractVendorData } from './dataParser.js';
+import { stampWaiverWithConfig } from './pdfEngine.js';
+import { initTemplateEditor } from './templateEditor.js';
 
-// Dummy data to test the stamp
-const currentVendor = {
-    projectName: "Red River Gorge Visitor Center",
-    vendorName: "Acme Concrete",
-    amount: "45,000.00"
-};
+// Global state to hold the directory connection
+let dirHandle;
 
-document.getElementById('generatePdfBtn').addEventListener('click', async () => {
+// 1. Connect Folder & Initialize Systems
+document.getElementById('folderBtn').addEventListener('click', async () => {
     try {
-        // 1. Get the template from your connected local /Templates folder
+        dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        document.getElementById('output').textContent = `Connected to: ${dirHandle.name}\nReady for operations.`;
+
+        // Pass the directory handle to the visual editor so it can save JSON maps
+        initTemplateEditor(dirHandle);
+
+        // Enable the main processing button
+        document.getElementById('readExcelBtn').disabled = false;
+    } catch (error) {
+        console.error(error);
+        document.getElementById('output').textContent = "Folder connection failed.";
+    }
+});
+
+// 2. The Main Processing Pipeline
+document.getElementById('readExcelBtn').addEventListener('click', async () => {
+    try {
+        const outputDiv = document.getElementById('output');
+        outputDiv.textContent = "Processing pipeline started...\n";
+
+        // A. Define Target (In the final UI, these come from your search boxes)
+        const targetJob = "12345";
+        const targetVendor = "Acme Concrete";
+
+        // B. Extract Data from Local Excel
+        const excelFileHandle = await dirHandle.getFileHandle('Invoices.xlsx', { create: false });
+        const excelFile = await excelFileHandle.getFile();
+        const excelBuffer = await excelFile.arrayBuffer();
+
+        const vendorData = await extractVendorData(excelBuffer, targetJob, targetVendor);
+        outputDiv.textContent += `Data extracted for ${vendorData.vendorName}.\n`;
+
+        // C. Load PDF Template and JSON Config from the /Templates subfolder
         const templatesDir = await dirHandle.getDirectoryHandle('Templates');
-        const templateFileHandle = await templatesDir.getFileHandle('Blank_Waiver.pdf');
-        const file = await templateFileHandle.getFile();
-        const arrayBuffer = await file.arrayBuffer();
+        
+        // Ensure these exact file names exist in your Templates folder for testing
+        const pdfHandle = await templatesDir.getFileHandle('WaiverTemplate.pdf');
+        const pdfFile = await pdfHandle.getFile();
+        const pdfBuffer = await pdfFile.arrayBuffer();
 
-        // 2. Pass the blank PDF and data to your new engine
-        const stampedPdfBytes = await stampWaiver(arrayBuffer, currentVendor);
+        const configHandle = await templatesDir.getFileHandle('WaiverTemplate_Config.json');
+        const configFile = await configHandle.getFile();
+        const configText = await configFile.text();
+        const configJson = JSON.parse(configText);
 
-        // 3. Save the finished PDF back to the local folder
-        const newFileHandle = await dirHandle.getFileHandle(`${currentVendor.vendorName}_Waiver.pdf`, { create: true });
+        // D. Stamp the PDF using the mapped coordinates
+        const stampedPdfBytes = await stampWaiverWithConfig(pdfBuffer, vendorData, configJson);
+
+        // E. Save the Finished PDF back to the main directory
+        const saveFileName = `${vendorData.vendorName}_Waiver.pdf`;
+        const newFileHandle = await dirHandle.getFileHandle(saveFileName, { create: true });
         const writable = await newFileHandle.createWritable();
         await writable.write(stampedPdfBytes);
         await writable.close();
 
-        console.log("Waiver stamped and saved successfully!");
+        outputDiv.textContent += `Success! Stamped and saved as ${saveFileName}.`;
+
     } catch (error) {
-        console.error("Failed to generate PDF:", error);
+        console.error(error);
+        document.getElementById('output').textContent += `\nError: ${error.message}`;
     }
 });
