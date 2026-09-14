@@ -1,5 +1,5 @@
 // dashboard.js
-
+let currentJobWaivers = []; // Tracks the waivers currently visible in the table
 // --- 1. Native Database Setup (No external CDNs) ---
 const dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open('WaiverIO_DB', 2);
@@ -83,14 +83,15 @@ function renderTable(jobId) {
     tableBody.innerHTML = '';
     if (!jobId) return;
 
-    const relevantWaivers = appData.noteDB.filter(row => String(row['JOB_ID']) === String(jobId));
+    // Filter Note DB by Job ID and update the global state
+    currentJobWaivers = appData.noteDB.filter(row => String(row['JOB_ID']) === String(jobId));
 
-    if (relevantWaivers.length === 0) {
+    if (currentJobWaivers.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No vendors found for this Job ID.</td></tr>';
         return;
     }
 
-    relevantWaivers.forEach(waiver => {
+    currentJobWaivers.forEach(waiver => {
         const tr = document.createElement('tr');
         
         let statusHtml = '';
@@ -165,4 +166,101 @@ window.addEventListener('DOMContentLoaded', async () => {
         connectBtn.textContent = "✅ Loaded from Cache";
         connectBtn.style.backgroundColor = "#28a745";
     }
+});
+
+// --- 7. Pre-Flight Validation Engine ---
+const runBatchBtn = document.getElementById('runBatchBtn');
+const preflightModal = document.getElementById('preflightModal');
+const preflightTableBody = document.getElementById('preflightTableBody');
+const preflightErrors = document.getElementById('preflightErrors');
+const confirmGenerateBtn = document.getElementById('confirmGenerateBtn');
+
+runBatchBtn.addEventListener('click', () => {
+    if (currentJobWaivers.length === 0) {
+        alert("No waivers to process. Please select a job first.");
+        return;
+    }
+
+    preflightTableBody.innerHTML = '';
+    let hasHardErrors = false;
+    let errorMessages = [];
+
+    currentJobWaivers.forEach((waiver, index) => {
+        const tr = document.createElement('tr');
+        const jobId = String(waiver['JOB_ID']);
+        const vendorId = String(waiver['VEN_ID']);
+        
+        // 1. Validate Email Setup (Checks 'Email Information' array)
+        const emailSetup = appData.emailInfo.find(e => String(e['Job ID']) === jobId && String(e['Vendor ID']) === vendorId);
+        const hasEmail = !!emailSetup;
+        
+        // 2. Validate Template
+        const hasTemplate = !!waiver['WAIVER_'] && waiver['WAIVER_'] !== "Not Set";
+        
+        // 3. Calculate Base Amount
+        const onbaseAmt = Number(waiver['In Onbase']) || 0;
+        const unpaidAmt = Number(waiver['Unpaid']) || 0;
+        const totalAmt = onbaseAmt + unpaidAmt;
+        const hasAmount = totalAmt > 0;
+
+        // Determine Status
+        let statusIcon = '✅';
+        let issues = [];
+        
+        if (!hasEmail) issues.push("Missing Email Setup");
+        if (!hasTemplate) issues.push("Missing Template");
+        if (!hasAmount) issues.push("$0.00 Balance");
+
+        if (issues.length > 0) {
+            statusIcon = '❌';
+            if (!hasEmail || !hasTemplate) {
+                hasHardErrors = true;
+                errorMessages.push(`<strong>${waiver['VEN_NAM']}:</strong> ${issues.join(', ')}`);
+            }
+        }
+
+        tr.innerHTML = `
+            <td style="text-align: center;">${statusIcon}</td>
+            <td><strong>${waiver['VEN_NAM'] || 'Unknown'}</strong></td>
+            <td style="${!hasEmail ? 'color: red; font-weight: bold;' : ''}">${hasEmail ? 'Valid' : 'Missing'}</td>
+            <td style="${!hasTemplate ? 'color: red; font-weight: bold;' : ''}">${hasTemplate ? 'Valid' : 'Missing'}</td>
+            <td>
+                $ <input type="number" step="0.01" value="${totalAmt.toFixed(2)}" 
+                       data-vendor="${vendorId}" class="manual-amt-override" 
+                       style="padding: 4px; width: 100px; ${!hasAmount ? 'border: 2px solid red;' : 'border: 1px solid #ccc;'}">
+            </td>
+        `;
+        preflightTableBody.appendChild(tr);
+    });
+
+    // Handle Error Banner
+    if (hasHardErrors) {
+        preflightErrors.style.display = 'block';
+        preflightErrors.innerHTML = `<strong>⚠️ Hard Stops Found:</strong><br>${errorMessages.join('<br>')}<br><br><small>You cannot generate this batch until email mappings and templates are resolved in the source data. Zero-dollar balances can be overridden below.</small>`;
+        confirmGenerateBtn.disabled = true;
+        confirmGenerateBtn.style.background = '#ccc';
+    } else {
+        preflightErrors.style.display = 'none';
+        confirmGenerateBtn.disabled = false;
+        confirmGenerateBtn.style.background = '#28a745';
+    }
+
+    preflightModal.showModal();
+});
+
+// Execute Batch
+confirmGenerateBtn.addEventListener('click', () => {
+    // Collect all manual overrides
+    const overrides = document.querySelectorAll('.manual-amt-override');
+    let finalBatchData = [];
+    
+    overrides.forEach((input) => {
+        const vendorId = input.getAttribute('data-vendor');
+        const overriddenAmt = parseFloat(input.value);
+        finalBatchData.push({ vendorId: vendorId, finalAmount: overriddenAmt });
+    });
+
+    console.log("Ready to process batch:", finalBatchData);
+    alert("Batch logic validated! Proceeding to Phase 4 (PDF Generation).");
+    preflightModal.close();
 });
