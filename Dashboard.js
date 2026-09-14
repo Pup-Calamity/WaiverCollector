@@ -249,10 +249,9 @@ runBatchBtn.addEventListener('click', () => {
 });
 
 // Execute Batch
-confirmGenerateBtn.addEventListener('click', () => {
-    // Collect all manual overrides
+confirmGenerateBtn.addEventListener('click', async () => {
     const overrides = document.querySelectorAll('.manual-amt-override');
-    let finalBatchData = [];
+    const finalBatchData = [];
     
     overrides.forEach((input) => {
         const vendorId = input.getAttribute('data-vendor');
@@ -260,7 +259,98 @@ confirmGenerateBtn.addEventListener('click', () => {
         finalBatchData.push({ vendorId: vendorId, finalAmount: overriddenAmt });
     });
 
-    console.log("Ready to process batch:", finalBatchData);
-    alert("Batch logic validated! Proceeding to Phase 4 (PDF Generation).");
-    preflightModal.close();
+    // Transform UI to show processing state
+    confirmGenerateBtn.disabled = true;
+    confirmGenerateBtn.textContent = "Processing Batch...";
+    preflightTableBody.style.opacity = "0.5";
+
+    try {
+        const templatesDir = await dirHandle.getDirectoryHandle('Templates');
+
+        for (const item of finalBatchData) {
+            // Locate the full data row for this vendor
+            const waiverData = currentJobWaivers.find(w => String(w['VEN_ID']) === item.vendorId);
+            
+            // Clean up the template name from the Excel data
+            let templateName = waiverData['WAIVER_'];
+            if (templateName.includes(';')) templateName = templateName.split(';')[0]; // Grabs the first template if multiple exist
+            templateName = templateName.trim() + ".pdf";
+
+            // 1. Fetch the raw PDF and its corresponding JSON mapping config
+            const pdfHandle = await templatesDir.getFileHandle(templateName);
+            const pdfFile = await pdfHandle.getFile();
+            const pdfBytes = await pdfFile.arrayBuffer();
+
+            const configHandle = await templatesDir.getFileHandle(templateName.replace('.pdf', '_Config.json'));
+            const configFile = await configHandle.getFile();
+            const configJson = JSON.parse(await configFile.text());
+
+            // 2. Initialize pdf-lib
+            const pdfDoc = await window.PDFLib.PDFDocument.load(pdfBytes);
+            const firstPage = pdfDoc.getPages()[0];
+
+            // 3. Draw Cover-Ups (White Rectangles) to hide old template text
+            if (configJson.coverUps) {
+                configJson.coverUps.forEach(box => {
+                    firstPage.drawRectangle({
+                        x: box.x,
+                        y: box.y,
+                        width: box.width,
+                        height: box.height,
+                        color: window.PDFLib.rgb(1, 1, 1)
+                    });
+                });
+            }
+
+            // 4. Build a clean dictionary of data to stamp
+            const stampData = {
+                "amount": item.finalAmount.toFixed(2),
+                "vendorName": waiverData['VEN_NAM'],
+                "vendorId": waiverData['VEN_ID'],
+                "projectName": waiverData['JOB_NAM'],
+                "jobId": waiverData['JOB_ID']
+            };
+
+            // 5. Stamp the mapped variables onto the PDF
+            if (configJson.fields) {
+                for (const [variableName, coords] of Object.entries(configJson.fields)) {
+                    if (stampData[variableName] !== undefined) {
+                        firstPage.drawText(String(stampData[variableName]), {
+                            x: coords.x,
+                            y: coords.y,
+                            size: coords.size || 12,
+                            color: window.PDFLib.rgb(0, 0, 0)
+                        });
+                    }
+                }
+            }
+
+            // 6. Save the newly stamped PDF back to the local file system
+            const savedPdf = await pdfDoc.save();
+            
+            // Create a subfolder for the Job ID if it doesn't exist yet
+            const jobFolder = await dirHandle.getDirectoryHandle(waiverData['JOB_ID'], { create: true });
+            
+            // Format the final file name (e.g., "21587 - Anderson Concrete - req.pdf")
+            const safeVendorName = waiverData['VEN_NAM'].replace(/[\\/:\*\?"<>\|]/g, '');
+            const finalFileName = `${waiverData['JOB_ID']} - ${safeVendorName} - req.pdf`;
+            
+            const finalFileHandle = await jobFolder.getFileHandle(finalFileName, { create: true });
+            const writable = await finalFileHandle.createWritable();
+            await writable.write(savedPdf);
+            await writable.close();
+        }
+
+        alert(`Successfully generated and saved ${finalBatchData.length} waivers!`);
+        preflightModal.close();
+
+    } catch (error) {
+        alert("Batch processing failed: " + error.message);
+        console.error(error);
+    } finally {
+        // Reset UI
+        confirmGenerateBtn.disabled = false;
+        confirmGenerateBtn.textContent = "Confirm & Generate Batch";
+        preflightTableBody.style.opacity = "1";
+    }
 });
