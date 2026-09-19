@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WaiverIO - Dashboard</title>
@@ -50,6 +52,10 @@
             <label>Master AR Folder</label>
             <button class="btn" id="connectBtn">Connect Folder</button>
         </div>
+        <div class="filter-group">
+            <label>Load Invoice File</label>
+            <button class="btn" id="LoadInv">Select File</button>
+        </div>
         <hr style="width: 100%; border: 0; border-top: 1px solid var(--border);">
         <div class="filter-group">
             <label>Month</label>
@@ -57,11 +63,11 @@
         </div>
         <div class="filter-group">
             <label>Burg</label>
-            <select id="burgSelect"><option>COLUMBUS</option></select>
+            <select id="burgSelect"><option>All</option></select>
         </div>
         <div class="filter-group">
             <label>Job Number</label>
-            <input type="text" id="jobInput" placeholder="e.g., 21587">
+            <select id="burgSelect"><option>COLUMBUS</option></select>
         </div>
     </div>
 
