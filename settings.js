@@ -1,3 +1,18 @@
+async function createUserProfile(baseDirHandle, username, pin, initialPreferences = {}) {
+    const settingsDir = await getSettingsFolder(baseDirHandle);
+    const fileName = `${username.toLowerCase()}.json`;
+    
+    const newUserConfig = {
+        username: username,
+        pin: pin, // simple 4-digit or text pin
+        theme: "dark",
+        ...initialPreferences
+    };
+    
+    await saveUserProfile(baseDirHandle, username, newUserConfig);
+    return newUserConfig;
+}
+
 // 1. Ensure the settings subfolder exists, or create it
 async function getSettingsFolder(baseDirHandle) {
     return await baseDirHandle.getDirectoryHandle('settings', { create: true });
