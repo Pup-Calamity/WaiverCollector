@@ -26,22 +26,27 @@ window.addEventListener('DOMContentLoaded', () => {
     
     // 1. Hub Navigation
     const launchBtn = document.getElementById('launchWaiverToolBtn');
-    if (!window.Workspace.appData || !window.Workspace.appData.waivers) {
-        const btn = document.getElementById('launchWaiverToolBtn');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = `<h3>Syncing Data...</h3>`;
-        
-        await loadDataset(); 
-        
-        btn.innerHTML = originalText; 
-    }
+    
+    if (launchBtn) {
+        // The CLICK listener must be async so we can await the data load
+        launchBtn.addEventListener('click', async () => {
+            
+            // If memory was wiped by a refresh, quietly reload the data
+            if (!window.Workspace.appData || !window.Workspace.appData.waivers) {
+                const originalText = launchBtn.innerHTML;
+                launchBtn.innerHTML = `<h3>Syncing Data...</h3>`;
+                
+                await loadDataset(); 
+                
+                launchBtn.innerHTML = originalText; 
+            }
 
-    switchView('waiverToolView');
-    populateMonthDropdown(); 
-    renderWaiverTable();     
-});
+            // Now that data is loaded (or was already there), switch the view
+            switchView('waiverToolView');
+            populateMonthDropdown(); 
+            renderWaiverTable();     
+        });
     }
-
     const backBtn = document.getElementById('backToHubBtn');
     if (backBtn) {
         backBtn.addEventListener('click', () => {
