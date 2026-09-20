@@ -2,10 +2,10 @@
 
 async function loadDataset() {
     try {
-        // Load Waivers
-        let waiverHandle = await findExcelFile(window.Workspace.dirHandle, "Vendor_Waivers");
-        if (waiverHandle) {
-            window.Workspace.appData.waivers = await extractAndValidateData(waiverHandle);
+        // Load Open AR
+        let ARHandle = await findExcelFile(window.Workspace.dirHandle, "Vendor_Waivers");
+        if (ARHandle) {
+            window.Workspace.appData.waivers = await extractAndValidateData(ARHandle);
         }
 
         // Load Invoices
