@@ -1,79 +1,86 @@
-// Global variable to track who is currently logged in
-let currentUser = null;
+// --- Global Shared State ---
+window.Workspace = {
+    dirHandle: null,
+    currentUser: null,
+    settings: {}
+};
 
-async function setupDirectory(handle) {
-    dirHandle = handle;
-    
-    // Hide the initial connect button
-    document.getElementById('connectionCard').style.display = 'none';
-    
-    // Show the login screen and populate it with team members
-    document.getElementById('authContainer').style.display = 'block';
-    await populateUserDropdown(dirHandle);
-    
-    const navStatus = document.getElementById('navStatus');
-    if (navStatus) navStatus.textContent = `✅ Connected: ${dirHandle.name}`;
+// --- Native Database Setup (IndexedDB for remembering the folder) ---
+const dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open('WaiverIO_DB', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('keyval');
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = () => reject(req.error);
+});
+
+async function getDB(key) {
+    const db = await dbPromise;
+    return new Promise((resolve, reject) => {
+        const req = db.transaction('keyval').objectStore('keyval').get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
 }
-// --- UI Toggles ---
-document.getElementById('showCreateBtn').addEventListener('click', (e) => {
-    e.preventDefault();
-    document.getElementById('loginSection').style.display = 'none';
-    document.getElementById('createSection').style.display = 'block';
-});
 
-document.getElementById('showLoginBtn').addEventListener('click', (e) => {
-    e.preventDefault();
-    document.getElementById('createSection').style.display = 'none';
-    document.getElementById('loginSection').style.display = 'block';
-});
+async function setDB(key, val) {
+    const db = await dbPromise;
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('keyval', 'readwrite');
+        tx.objectStore('keyval').put(val, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
 
-// --- Login Action ---
-document.getElementById('loginBtn').addEventListener('click', async () => {
-    const selectedUser = document.getElementById('userDropdown').value;
-    const pin = document.getElementById('userPin').value;
-    
-    if (!selectedUser || !pin) {
-        alert("Please select a profile and enter your PIN.");
-        return;
-    }
+// --- File System & Permissions ---
+async function verifyPermission(fileHandle) {
+    if ((await fileHandle.queryPermission({ mode: 'readwrite' })) === 'granted') return true;
+    if ((await fileHandle.requestPermission({ mode: 'readwrite' })) === 'granted') return true;
+    return false;
+}
+
+// --- User Profile Management ---
+async function getSettingsFolder(baseDirHandle) {
+    return await baseDirHandle.getDirectoryHandle('settings', { create: true });
+}
+
+async function populateUserDropdown() {
+    const dropdown = document.getElementById('userDropdown');
+    dropdown.innerHTML = '<option value="">-- Select Profile --</option>';
     
     try {
-        appSettings = await loadUserProfile(dirHandle, selectedUser, pin);
-        currentUser = selectedUser;
-        
-        // Success! Hide auth, show main workspace
-        document.getElementById('authContainer').style.display = 'none';
-        document.getElementById('processingWorkspace').style.display = 'block';
-        console.log(`Welcome back, ${currentUser}!`);
-        
+        const settingsDir = await getSettingsFolder(window.Workspace.dirHandle);
+        for await (const entry of settingsDir.values()) {
+            if (entry.kind === 'file' && entry.name.endsWith('.json')) {
+                const username = entry.name.replace('.json', '');
+                const option = document.createElement('option');
+                option.value = username;
+                option.textContent = username.charAt(0).toUpperCase() + username.slice(1);
+                dropdown.appendChild(option);
+            }
+        }
     } catch (error) {
-        alert(error.message); // e.g., "Incorrect passcode."
+        console.log("No settings folder found. Ready for first user.");
     }
-});
+}
 
-// --- Create Profile Action ---
-document.getElementById('createProfileBtn').addEventListener('click', async () => {
-    const newName = document.getElementById('newUsername').value.trim();
-    const newPin = document.getElementById('newPin').value.trim();
+async function loadUserProfile(username, password) {
+    const settingsDir = await getSettingsFolder(window.Workspace.dirHandle);
+    const fileHandle = await settingsDir.getFileHandle(`${username.toLowerCase()}.json`);
+    const file = await fileHandle.getFile();
+    const userData = JSON.parse(await file.text());
     
-    if (!newName || !newPin) {
-        alert("Please enter a name and a PIN.");
-        return;
-    }
-    
-    try {
-        // Create the user and immediately log them in
-        appSettings = await createUserProfile(dirHandle, newName, newPin);
-        currentUser = newName;
-        
-        document.getElementById('authContainer').style.display = 'none';
-        document.getElementById('processingWorkspace').style.display = 'block';
-        console.log(`Profile created! Welcome to the team, ${currentUser}!`);
-        
-    } catch (error) {
-        alert("Failed to create profile: " + error.message);
-    }
-});
+    if (userData.pin && userData.pin !== password) throw new Error("Incorrect passcode.");
+    return userData;
+}
+
+async function saveUserProfile(username, settingsObject) {
+    const settingsDir = await getSettingsFolder(window.Workspace.dirHandle);
+    const fileHandle = await settingsDir.getFileHandle(`${username.toLowerCase()}.json`, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(JSON.stringify(settingsObject, null, 4));
+    await writable.close();
+}
 
 async function createUserProfile(baseDirHandle, username, pin, initialPreferences = {}) {
     const settingsDir = await getSettingsFolder(baseDirHandle);
@@ -90,69 +97,111 @@ async function createUserProfile(baseDirHandle, username, pin, initialPreference
     return newUserConfig;
 }
 
-// 1. Ensure the settings subfolder exists, or create it
-async function getSettingsFolder(baseDirHandle) {
-    return await baseDirHandle.getDirectoryHandle('settings', { create: true });
+
+// --- UI Navigation Helpers ---
+function switchView(viewId) {
+    document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+    document.getElementById(viewId).classList.add('active');
 }
 
-// 2. Scan the settings folder and populate the dropdown list
-async function populateUserDropdown(baseDirHandle) {
-    const dropdown = document.getElementById('userDropdown');
-    dropdown.innerHTML = '<option value="">-- Choose Profile --</option>';
-    
-    try {
-        const settingsDir = await getSettingsFolder(baseDirHandle);
-        
-        // Loop through all the .json files in the settings folder
-        for await (const entry of settingsDir.values()) {
-            if (entry.kind === 'file' && entry.name.endsWith('.json')) {
-                const username = entry.name.replace('.json', '');
-                
-                const option = document.createElement('option');
-                option.value = username;
-                // Capitalize the first letter so it looks nice in the UI
-                option.textContent = username.charAt(0).toUpperCase() + username.slice(1); 
-                dropdown.appendChild(option);
-            }
-        }
-    } catch (error) {
-        console.log("No settings folder yet. Ready for the first user!");
+function applyTheme(themeStr) {
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeStr === 'dark') {
+        document.body.setAttribute('data-theme', 'dark');
+        themeToggle.textContent = '☀️';
+    } else {
+        document.body.removeAttribute('data-theme');
+        themeToggle.textContent = '🌙';
     }
 }
+////@@@@@@@@@@@@@
+async function setupDirectory(handle) {
+    dirHandle = handle;
+    
+    // Hide the initial connect button
+    document.getElementById('connectionCard').style.display = 'none';
+    
+    // Show the login screen and populate it with team members
+    document.getElementById('authContainer').style.display = 'block';
+    await populateUserDropdown(dirHandle);
+    
+    const navStatus = document.getElementById('navStatus');
+    if (navStatus) navStatus.textContent = `✅ Connected: ${dirHandle.name}`;
+}
 
-// 3. Load a specific user's config file
-async function loadUserProfile(baseDirHandle, username, password) {
+window.addEventListener('DOMContentLoaded', async () => {
     try {
-        const settingsDir = await getSettingsFolder(baseDirHandle);
-        const fileName = `${username.toLowerCase()}.json`;
-        
-        const fileHandle = await settingsDir.getFileHandle(fileName);
-        const file = await fileHandle.getFile();
-        const userData = JSON.parse(await file.text());
-        
-        // Simple light verification (not military grade, but keeps files separate)
-        if (userData.pin && userData.pin !== password) {
-            throw new Error("Incorrect passcode.");
+        const storedHandle = await getDB('masterARFolder');
+        if (storedHandle && (await storedHandle.queryPermission({ mode: 'readwrite' })) === 'granted') {
+            window.Workspace.dirHandle = storedHandle;
+            document.getElementById('navStatus').innerHTML = `🟢 ${storedHandle.name}`;
+            await populateUserDropdown();
+            switchView('authContainer');
         }
-        
-        return userData;
-    } catch (error) {
-        if (error.name === "NotFoundError") {
-            throw new Error("User profile not found.");
-        }
-        throw error;
+    } catch (e) {
+        console.warn("Could not load stored directory.", e);
     }
-}
+});
 
-// 4. Save the current user's profile changes
-async function saveUserProfile(baseDirHandle, username, settingsObject) {
-    const settingsDir = await getSettingsFolder(baseDirHandle);
-    const fileName = `${username.toLowerCase()}.json`;
+document.getElementById('connectFolderBtn').addEventListener('click', async () => {
+    try {
+        const newHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        await setDB('masterARFolder', newHandle);
+        window.Workspace.dirHandle = newHandle;
+        
+        document.getElementById('navStatus').innerHTML = `🟢 ${newHandle.name}`;
+        await populateUserDropdown();
+        switchView('authContainer');
+    } catch (error) {
+        if (error.name !== 'AbortError') alert(`Connection failed: ${error.message}`);
+    }
+});
+// --- UI Toggles ---
+document.getElementById('showCreateBtn').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('loginSection').style.display = 'none';
+    document.getElementById('createSection').style.display = 'block';
+});
+document.getElementById('showLoginBtn').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('createSection').style.display = 'none';
+    document.getElementById('loginSection').style.display = 'block';
+});
+// --- Login Action ---
+document.getElementById('loginBtn').addEventListener('click', async () => {
+    const user = document.getElementById('userDropdown').value;
+    const pin = document.getElementById('userPin').value;
+    if (!user || !pin) return alert("Select a profile and enter PIN.");
     
-    const fileHandle = await settingsDir.getFileHandle(fileName, { create: true });
-    const writable = await fileHandle.createWritable();
+    try {
+        window.Workspace.settings = await loadUserProfile(user, pin);
+        window.Workspace.currentUser = user;
+        
+        applyTheme(window.Workspace.settings.theme || 'light');
+        document.getElementById('welcomeText').textContent = `Welcome, ${user}!`;
+        switchView('processingWorkspace');
+    } catch (error) {
+        alert(error.message);
+    }
+});
+
+// --- Create Profile Action ---
+document.getElementById('createProfileBtn').addEventListener('click', async () => {
+    const newName = document.getElementById('newUsername').value.trim();
+    const newPin = document.getElementById('newPin').value.trim();
+    if (!newName || !newPin) return alert("Name and PIN required.");
     
-    await writable.write(JSON.stringify(settingsObject, null, 4));
-    await writable.close();
-    console.log(`✅ Saved settings for ${username}`);
-}
+    try {
+        const newConfig = { username: newName, pin: newPin, theme: 'light' };
+        await saveUserProfile(newName, newConfig);
+        
+        window.Workspace.settings = newConfig;
+        window.Workspace.currentUser = newName;
+        
+        document.getElementById('welcomeText').textContent = `Welcome, ${newName}!`;
+        switchView('processingWorkspace');
+    } catch (error) {
+        alert("Failed to create profile: " + error.message);
+    }
+});
+
