@@ -296,6 +296,8 @@
         }
 
         themeToggle.addEventListener('click', () => {
+            let newTheme = 'light';
+            
             if (document.body.getAttribute('data-theme') === 'dark') {
                 document.body.removeAttribute('data-theme');
                 localStorage.setItem('theme', 'light');
@@ -304,10 +306,16 @@
                 document.body.setAttribute('data-theme', 'dark');
                 localStorage.setItem('theme', 'dark');
                 themeToggle.textContent = '☀️';
+                newTheme = 'dark';
             }
             
-            // Optional: If a user is logged in, you can also save this to their personal config.json!
-            if (currentUser) { appSettings.theme = localStorage.getItem('theme'); saveUserProfile(...); }
+            // If a user is logged in, save this choice directly to their local profile!
+            if (window.Workspace && window.Workspace.currentUser) {
+                window.Workspace.settings.theme = newTheme;
+                // Calls the function from settings.js using the global state
+                saveUserProfile(window.Workspace.currentUser, window.Workspace.settings)
+                    .catch(err => console.error("Failed to save theme to profile:", err));
+            }
         });
     </script>
 </body>
