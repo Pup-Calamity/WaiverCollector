@@ -1,28 +1,32 @@
 // dataLoader.js
 
+// dataLoader.js
+
 async function loadDataset() {
-    try {
-        // Load Open AR
-        let ARHandle = await findExcelFile(window.Workspace.dirHandle, "Vendor_Waivers");
-        if (ARHandle) {
-            window.Workspace.appData.waivers = await extractAndValidateData(ARHandle);
-        }
+    // Grab the hardcoded master dictionary instead of user settings
+    const filePaths = window.WORKSPACE_FILE_PATHS;
 
-        // Load Invoices
-        let invoiceHandle = await findExcelFile(window.Workspace.dirHandle, "AR_Invoices");
-        if (invoiceHandle) {
-            window.Workspace.appData.waiverInvoices = await extractAndValidateData(invoiceHandle);
-        }
+    console.log("Starting parallel data load from strict paths...");
 
-        // Load Employee Emails
-        let emailHandle = await findExcelFile(window.Workspace.dirHandle, "Employee_Directory");
-        if (emailHandle) {
-            window.Workspace.appData.empEmails = await extractAndValidateData(emailHandle);
+    const loadTasks = Object.entries(filePaths).map(async ([dataKey, pathStr]) => {
+        try {
+            // Find the file using the strict path
+            const fileHandle = await getFileByPath(window.Workspace.dirHandle, pathStr);
+            
+            if (fileHandle) {
+                window.Workspace.appData[dataKey] = await extractAndValidateData(fileHandle);
+                console.log(`✅ Loaded ${dataKey}`);
+            } else {
+                // If it's missing, tell them exactly where it's supposed to be
+                console.warn(`⚠️ File missing: Expected to find ${pathStr}`);
+            }
+        } catch (error) {
+            console.error(`❌ Failed to parse ${pathStr}:`, error.message);
         }
-        
-        console.log("Entire database loaded!", window.Workspace.appData);
+    });
 
-    } catch (error) {
-        console.error("Data loading failed:", error.message);
-    }
+    // Fire all tasks simultaneously
+    await Promise.all(loadTasks);
+
+    console.log("Entire database loaded!", window.Workspace.appData);
 }
