@@ -314,6 +314,8 @@
             </select>
             
             <button id="refreshWaiversBtn" class="primary-btn" style="width: auto; margin: 0;">Refresh Data</button>
+
+            <button id="openCustomWaiverBtn" class="primary-btn" style="width: auto; margin: 0; background: #10b981;">+ One Time Waiver</button>
         </div>
 
         <!-- The Data Table -->
@@ -338,6 +340,53 @@
                     </tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- One Time Waiver Modal -->
+    <div id="customWaiverModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000;">
+        <div class="card" style="width: 100%; max-width: 500px; padding: 30px; text-align: left;">
+            <h2 style="margin-bottom: 5px;">Create One Time Waiver</h2>
+            <p class="subtitle">Manually generate a custom tracking record.</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div>
+                    <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Job ID</label>
+                    <input type="text" id="cwJobId" placeholder="e.g., J-101" required>
+                </div>
+                <div>
+                    <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Vendor ID</label>
+                    <input type="text" id="cwVendorId" placeholder="e.g., V-500" required>
+                </div>
+                <div>
+                    <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Target Month</label>
+                    <select id="cwMonth">
+                        <option value="1">1 - Jan</option><option value="2">2 - Feb</option>
+                        <option value="3">3 - Mar</option><option value="4">4 - Apr</option>
+                        <option value="5">5 - May</option><option value="6">6 - Jun</option>
+                        <option value="7">7 - Jul</option><option value="8">8 - Aug</option>
+                        <option value="9">9 - Sep</option><option value="10">10 - Oct</option>
+                        <option value="11">11 - Nov</option><option value="12">12 - Dec</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Target Year</label>
+                    <input type="number" id="cwYear" value="2026">
+                </div>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid var(--border-color); margin: 20px 0;">
+
+            <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Custom Through Period</label>
+            <input type="text" id="cwThrough" placeholder="e.g., 8/15/2026 to 9/10/2026">
+
+            <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Custom Due Date</label>
+            <input type="text" id="cwDue" placeholder="e.g., 10/15/2026">
+
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button id="cancelCustomWaiverBtn" class="primary-btn" style="background: transparent; color: var(--text-main); border: 1px solid var(--border-color);">Cancel</button>
+                <button id="saveCustomWaiverBtn" class="primary-btn">Generate & Save</button>
+            </div>
         </div>
     </div>
 
