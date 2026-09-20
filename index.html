@@ -215,8 +215,11 @@
     <nav style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; border-bottom: 1px solid var(--border-color); background: var(--bg-color);">
     
         <!-- Left Zone: Connection Status -->
-        <div style="display: flex; align-items: center; flex: 1;">
+        <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
             <div id="navStatus" class="status-pill" style="margin: 0;">🔴 Disconnected</div>
+            <button id="changeFolderBtn" style="background: transparent; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: 4px; padding: 4px 8px; font-size: 0.8em; cursor: pointer; transition: all 0.2s;">
+                Change Folder
+            </button>
         </div>
     
         <!-- Center Zone: Data Sync -->
