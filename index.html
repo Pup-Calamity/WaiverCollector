@@ -7,222 +7,20 @@
     
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     
-    <style>
-        /* --- CSS Variables for Light Mode (Default) --- */
-        :root {
-            --brand-color: #6366f1; /* Vibrant Indigo */
-            --brand-hover: #4f46e5;
-            --bg-color: #f8fafc;
-            --surface-color: #ffffff;
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-            --border-color: #e2e8f0;
-            --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
-            --hover-shadow: 0 20px 25px -5px rgba(99, 102, 241, 0.15);
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        /* --- CSS Variables for Dark Mode --- */
-        [data-theme="dark"] {
-            --brand-color: #818cf8;
-            --brand-hover: #6366f1;
-            --bg-color: #0f172a; /* Deep slate */
-            --surface-color: #1e293b;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --border-color: #334155;
-            --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
-            --hover-shadow: 0 20px 25px -5px rgba(129, 140, 248, 0.15);
-        }
-
-        /* --- Global Reset & Body --- */
-        body {
-            font-family: -apple-system, system-ui, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            margin: 0;
-            padding: 40px 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            transition: background-color 0.3s ease, color 0.3s ease;
-        }
-
-        /* --- Navigation --- */
-        nav {
-            width: 100%;
-            max-width: 900px;
-            display: flex;
-            justify-content: space-between; /* Space between status and theme toggle */
-            align-items: center;
-            margin-bottom: 40px;
-        }
-
-        .status-pill {
-            background: var(--surface-color);
-            padding: 8px 16px;
-            border-radius: 30px;
-            font-size: 0.85em;
-            font-weight: 600;
-            color: var(--text-muted);
-            border: 1px solid var(--border-color);
-            transition: var(--transition);
-        }
-
-        .icon-btn {
-            background: var(--surface-color);
-            border: 1px solid var(--border-color);
-            color: var(--text-main);
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2em;
-            transition: var(--transition);
-        }
-        
-        .icon-btn:hover {
-            border-color: var(--brand-color);
-            color: var(--brand-color);
-            transform: rotate(15deg);
-        }
-
-        /* --- Containers --- */
-        .view-section {
-            display: none;
-            width: 100%;
-            max-width: 400px;
-            animation: fadeIn 0.4s ease-out forwards;
-        }
-        
-        .view-section.active {
-            display: block;
-        }
-
-        .hub-section {
-            max-width: 900px;
-        }
-
-        .card {
-            background: var(--surface-color);
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: var(--card-shadow);
-            border: 1px solid var(--border-color);
-            text-align: center;
-            transition: var(--transition);
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(15px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* --- Typography & Forms --- */
-        h2 { margin: 0 0 8px 0; font-size: 1.6em; }
-        p.subtitle { color: var(--text-muted); margin-bottom: 25px; font-size: 0.95em; }
-
-        input, select {
-            width: 100%;
-            padding: 14px;
-            margin-bottom: 20px;
-            background-color: var(--bg-color);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            color: var(--text-main);
-            box-sizing: border-box;
-            transition: var(--transition);
-        }
-        
-        input:focus, select:focus {
-            outline: none;
-            border-color: var(--brand-color);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
-        }
-
-        button.primary-btn {
-            background-color: var(--brand-color);
-            color: white;
-            border: none;
-            padding: 14px;
-            border-radius: 12px;
-            cursor: pointer;
-            font-weight: bold;
-            width: 100%;
-            transition: var(--transition);
-        }
-        
-        button.primary-btn:hover {
-            background-color: var(--brand-hover);
-            transform: translateY(-2px);
-        }
-
-        a { color: var(--brand-color); text-decoration: none; font-weight: 600; }
-        a:hover { text-decoration: underline; }
-
-        /* --- Tool Grid (The Dashboard) --- */
-        .tool-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 25px;
-            margin-top: 30px;
-        }
-
-        .tool-card {
-            background: var(--surface-color);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 25px;
-            text-align: left;
-            box-shadow: var(--card-shadow);
-            transition: var(--transition);
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .tool-card:hover {
-            transform: translateY(-5px);
-            border-color: var(--brand-color);
-            box-shadow: var(--hover-shadow);
-        }
-
-        .tool-icon {
-            font-size: 2em;
-            margin-bottom: 15px;
-        }
-
-        .tool-card h3 { margin: 0 0 10px 0; font-size: 1.2em; }
-        .tool-card p { color: var(--text-muted); font-size: 0.9em; flex-grow: 1; margin: 0 0 20px 0; line-height: 1.4; }
-        
-        .launch-link {
-            color: var(--brand-color);
-            font-weight: bold;
-            font-size: 0.9em;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-    </style>
+    <!-- External CSS Links -->
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/components.css">
 </head>
 <body>
 
     <!-- Top Navigation -->
     <nav style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; border-bottom: 1px solid var(--border-color); background: var(--bg-color);">
-    
-        <!-- Left Zone: Connection Status -->
         <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
             <div id="navStatus" class="status-pill" style="margin: 0;">🔴 Disconnected</div>
             <button id="changeFolderBtn" style="background: transparent; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: 4px; padding: 4px 8px; font-size: 0.8em; cursor: pointer; transition: all 0.2s;">
                 Change Folder
             </button>
         </div>
-    
-        <!-- Center Zone: Data Sync -->
         <div style="display: flex; align-items: center; justify-content: center; gap: 12px; flex: 1;">
             <button id="manualSyncBtn" class="primary-btn" style="width: auto; margin: 0; padding: 6px 16px; background: #3b82f6; font-size: 0.9em;">
                 📥 Sync Data
@@ -231,15 +29,12 @@
                 Waiting for sync...
             </span>
         </div>
-    
-        <!-- Right Zone: User Actions -->
         <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex: 1;">
             <button id="themeToggle" class="icon-btn" title="Toggle Dark Mode" style="margin: 0; padding: 6px;">🌙</button>
             <button id="logoutBtn" style="width: auto; margin: 0; padding: 6px 12px; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em; cursor: pointer; transition: all 0.2s;">
                 Log Out
             </button>
         </div>
-    
     </nav>
 
     <!-- VIEW 1: Connect Folder -->
@@ -255,7 +50,6 @@
         <div style="font-size: 3em; margin-bottom: 10px;">👋</div>
         <h2>Welcome Back</h2>
         <p class="subtitle">Who is logging in today?</p>
-        
         <div id="loginSection">
             <select id="userDropdown"><option value="">-- Select Profile --</option></select>
             <input type="password" id="userPin" placeholder="Passcode">
@@ -264,7 +58,6 @@
                 New here? <a href="#" id="showCreateBtn">Create Profile</a>
             </p>
         </div>
-
         <div id="createSection" style="display: none;">
             <input type="text" id="newUsername" placeholder="Your Name">
             <input type="password" id="newPin" placeholder="Create Passcode">
@@ -279,25 +72,19 @@
     <div id="processingWorkspace" class="view-section hub-section">
         <h2 id="welcomeText">Welcome to the Hub</h2>
         <p class="subtitle">Select a tool to launch your workflow.</p>
-        
         <div class="tool-grid">
-            <!-- Tool 1 -->
-            <div class="tool-card" id="launchWaiverToolBtn")">
+            <div class="tool-card" id="launchWaiverToolBtn">
                 <div class="tool-icon">📝</div>
                 <h3>Waiver Processor</h3>
                 <p>Process vendor lien waivers, check compliance, and update master records.</p>
                 <div class="launch-link">Launch Tool →</div>
             </div>
-
-            <!-- Tool 2 -->
             <div class="tool-card" id="launchEmailToolBtn">
                 <div class="tool-icon">📬</div>
                 <h3>Automated Emails</h3>
                 <p>Batch generate Outlook .eml drafts for waivers, invoices, and compliance.</p>
                 <div class="launch-link">Launch Tool →</div>
             </div>
-
-            <!-- Tool 3 -->
             <div class="tool-card" onclick="alert('Launching Data Dashboard...')">
                 <div class="tool-icon">📈</div>
                 <h3>Finance Dashboard</h3>
@@ -309,8 +96,6 @@
 
     <!-- VIEW 4: Waiver Processor Tool -->
     <div id="waiverToolView" class="view-section hub-section">
-        
-        <!-- Header & Navigation -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <div>
                 <h2>📝 Waiver Processor</h2>
@@ -320,32 +105,21 @@
                 ← Back to Hub
             </button>
         </div>
-
         <hr>
-
-        <!-- Control Bar: Search and Filters -->
         <div style="display: flex; gap: 15px; margin-bottom: 20px;">
             <input type="text" id="waiverSearch" placeholder="Search Job ID or Vendor..." style="margin-bottom: 0; flex-grow: 1;">
-
             <select id="waiverMonthFilter" style="margin-bottom: 0; width: 180px;">
                 <option value="ALL">All Months</option>
-                <!-- JavaScript will auto-fill this based on your data -->
             </select>
-            
             <select id="waiverStatusFilter" style="margin-bottom: 0; width: 200px;">
                 <option value="ALL">All Waivers</option>
                 <option value="PENDING">Pending (Not Received)</option>
                 <option value="RECEIVED">Received</option>
             </select>
-            
             <button id="refreshWaiversBtn" class="primary-btn" style="width: auto; margin: 0;">Refresh Data</button>
-
             <button id="openCustomWaiverBtn" class="primary-btn" style="width: auto; margin: 0; background: #10b981;">+ One Time Waiver</button>
         </div>
 
-        
-
-        <!-- The Data Table -->
         <div style="background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; box-shadow: var(--card-shadow);">
             <table style="width: 100%; border-collapse: collapse; text-align: left;">
                 <thead>
@@ -359,12 +133,7 @@
                     </tr>
                 </thead>
                 <tbody id="waiverTableBody">
-                    <!-- JavaScript will inject the rows here -->
-                    <tr>
-                        <td colspan="6" style="padding: 30px; text-align: center; color: var(--text-muted);">
-                            No data loaded.
-                        </td>
-                    </tr>
+                    <tr><td colspan="6" style="padding: 30px; text-align: center; color: var(--text-muted);">No data loaded.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -372,8 +141,6 @@
 
     <!-- VIEW 5: Automated Email Tool -->
     <div id="emailToolView" class="view-section hub-section">
-        
-        <!-- Header & Navigation -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <div>
                 <h2>📬 Automated Email Generator</h2>
@@ -383,10 +150,7 @@
                 ← Back to Hub
             </button>
         </div>
-    
         <hr>
-    
-        <!-- Control Bar: Settings -->
         <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: flex-end;">
             <div>
                 <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted); display: block; margin-bottom: 5px;">Report Type</label>
@@ -394,7 +158,6 @@
                     <option value="APPROVAL_REMINDERS">AP03 Approval Reminders</option>
                 </select>
             </div>
-            
             <div>
                 <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted); display: block; margin-bottom: 5px;">Target Month</label>
                 <select id="emailMonth" style="margin-bottom: 0; width: 120px;">
@@ -406,16 +169,13 @@
                     <option value="11">11 - Nov</option><option value="12">12 - Dec</option>
                 </select>
             </div>
-    
             <div>
                 <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted); display: block; margin-bottom: 5px;">Target Year</label>
                 <input type="number" id="emailYear" value="2026" style="margin-bottom: 0; width: 100px;">
             </div>
-            
             <button id="runEmailBatchBtn" class="primary-btn" style="width: auto; margin: 0; background: #10b981;">🚀 Generate Batch</button>
         </div>
-    
-        <!-- The Output Log -->
+        
         <div style="background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; height: 400px; overflow-y: auto; font-family: monospace; font-size: 0.9em;">
             <div style="font-weight: bold; margin-bottom: 10px; color: var(--text-muted);">--- GENERATION LOG ---</div>
             <ul id="emailOutputLog" style="list-style-type: none; padding: 0; margin: 0;">
@@ -423,13 +183,12 @@
             </ul>
         </div>
     </div>
-    
+
     <!-- One Time Waiver Modal -->
     <div id="customWaiverModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000;">
         <div class="card" style="width: 100%; max-width: 500px; padding: 30px; text-align: left;">
             <h2 style="margin-bottom: 5px;">Create One Time Waiver</h2>
             <p class="subtitle">Manually generate a custom tracking record.</p>
-            
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                 <div>
                     <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Job ID</label>
@@ -455,15 +214,11 @@
                     <input type="number" id="cwYear" value="2026">
                 </div>
             </div>
-
             <hr style="border: none; border-top: 1px solid var(--border-color); margin: 20px 0;">
-
             <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Custom Through Period</label>
             <input type="text" id="cwThrough" placeholder="e.g., 8/15/2026 to 9/10/2026">
-
             <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Custom Due Date</label>
             <input type="text" id="cwDue" placeholder="e.g., 10/15/2026">
-
             <div style="display: flex; gap: 10px; margin-top: 10px;">
                 <button id="cancelCustomWaiverBtn" class="primary-btn" style="background: transparent; color: var(--text-main); border: 1px solid var(--border-color);">Cancel</button>
                 <button id="saveCustomWaiverBtn" class="primary-btn">Generate & Save</button>
@@ -471,44 +226,17 @@
         </div>
     </div>
 
-    <script src="settings.js"></script>
-    <script src="dataParser.js"></script>
-    <script src="dataLoader.js"></script>
-    <script src="waiverTool.js"></script>
-    <script src="Emails.js"></script>
-    <script src="Reports.js"></script>
-    <script>
-        // --- Dark/Light Mode Logic ---
-        const themeToggle = document.getElementById('themeToggle');
-        
-        // Check for saved theme in standard browser local storage just for immediate page load
-        if (localStorage.getItem('theme') === 'dark') {
-            document.body.setAttribute('data-theme', 'dark');
-            themeToggle.textContent = '☀️';
-        }
+    <!-- Core Scripts -->
+    <script src="js/core/storage.js"></script>
+    <script src="js/core/app.js"></script>
+    
+    <!-- Utility Scripts -->
+    <script src="js/utils/excel.js"></script>
+    <script src="js/utils/helpers.js"></script>
+    
+    <!-- Tool Scripts -->
+    <script src="js/tools/waiverTool.js"></script>
+    <script src="js/tools/emailTool.js"></script>
 
-        themeToggle.addEventListener('click', () => {
-            let newTheme = 'light';
-            
-            if (document.body.getAttribute('data-theme') === 'dark') {
-                document.body.removeAttribute('data-theme');
-                localStorage.setItem('theme', 'light');
-                themeToggle.textContent = '🌙';
-            } else {
-                document.body.setAttribute('data-theme', 'dark');
-                localStorage.setItem('theme', 'dark');
-                themeToggle.textContent = '☀️';
-                newTheme = 'dark';
-            }
-            
-            // If a user is logged in, save this choice directly to their local profile!
-            if (window.Workspace && window.Workspace.currentUser) {
-                window.Workspace.settings.theme = newTheme;
-                // Calls the function from settings.js using the global state
-                saveUserProfile(window.Workspace.currentUser, window.Workspace.settings)
-                    .catch(err => console.error("Failed to save theme to profile:", err));
-            }
-        });
-    </script>
 </body>
 </html>
