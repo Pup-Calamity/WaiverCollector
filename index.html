@@ -6,7 +6,7 @@
     <title>Team Workspace Hub</title>
     
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <!-- External CSS Links -->
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/components.css">
@@ -183,6 +183,72 @@
             </ul>
         </div>
     </div>
+
+    <!-- VIEW 6: Visual Template Mapper -->
+    <div id="templateMapperView" class="view-section hub-section">
+        
+        <!-- Header & Navigation -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+                <h2>🖍️ Visual Template Mapper</h2>
+                <p class="subtitle" style="margin-bottom: 0;">Build smart PDF masks for automated waiver generation.</p>
+            </div>
+            <button id="backToHubFromMapperBtn" class="icon-btn" style="width: auto; padding: 10px 20px; border-radius: 8px;">
+                ← Back to Hub
+            </button>
+        </div>
+        
+        <hr>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <!-- Manage Saved Templates Card -->
+            <div class="card" style="padding: 20px; text-align: left;">
+                <h3 style="margin-top: 0; font-size: 1.1em; color: var(--text-main);">Manage Saved Templates</h3>
+                <select id="templateDropdown" style="margin-bottom: 15px;">
+                    <option value="">-- Connect folder to load templates --</option>
+                </select>
+                <button id="deleteTemplateBtn" class="primary-btn" disabled style="background: #dc3545;">Delete Selected Template</button>
+            </div>
+
+            <!-- Toolbar Card -->
+            <div class="card" style="padding: 20px; text-align: left; background: var(--bg-color);">
+                <h3 style="margin-top: 0; font-size: 1.1em; color: var(--text-main);">Tool Selection</h3>
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;">
+                    <label style="cursor: pointer; font-weight: bold; color: var(--text-main);">
+                        <input type="radio" name="toolMode" value="variable" checked> 🟢 Click to Add/Move Variables
+                    </label>
+                    <label style="cursor: pointer; font-weight: bold; color: var(--text-main);">
+                        <input type="radio" name="toolMode" value="coverup"> ⬜ Click & Drag to Draw Whiteout
+                    </label>
+                </div>
+                <div style="font-size: 0.85em; color: var(--text-muted);">
+                    <em>Hint: <strong>Right-Click</strong> any green variable or whiteout box to delete it!</em>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+            <button id="loadPdfBtn" class="primary-btn" style="width: auto;">Load PDF to Canvas</button>
+            <button id="saveMapBtn" class="primary-btn" disabled style="width: auto; background: #10b981;">Save JSON Map</button>
+        </div>
+        
+        <div id="output" style="background: #1e1e1e; color: #4af626; padding: 15px; border-radius: 8px; font-family: monospace; height: 60px; overflow-y: auto; margin-bottom: 15px;">System Ready. Load a PDF to begin.</div>
+        
+        <div style="background: white; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; display: flex; justify-content: center; padding: 20px;">
+            <canvas id="pdfCanvas" style="border: 1px solid #ccc; max-width: 100%; cursor: crosshair; user-select: none;"></canvas>
+        </div>
+
+    </div>
+
+    <!-- Variable Selection Modal -->
+    <dialog id="variableModal" style="padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: var(--card-shadow); width: 350px; background: var(--surface-color); color: var(--text-main);">
+        <h3 style="margin-top: 0; color: var(--text-main);">Select Variable</h3>
+        <select id="variableSelect" style="padding: 12px; width: 100%; margin-bottom: 20px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);"></select>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button id="cancelVariableBtn" class="primary-btn" style="background: transparent; color: var(--text-main); border: 1px solid var(--border-color); width: auto;">Cancel</button>
+            <button id="confirmVariableBtn" class="primary-btn" style="width: auto;">Add Variable</button>
+        </div>
+    </dialog>
 
     <!-- One Time Waiver Modal -->
     <div id="customWaiverModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000;">
