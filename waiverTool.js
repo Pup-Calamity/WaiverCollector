@@ -226,3 +226,75 @@ function calculateWaiverDates(targetMonth, targetYear, dueDayOffset, throughDay)
         throughPeriod: throughPeriodStr
     };
 }
+
+// --- One Time Waiver Modal Logic ---
+window.addEventListener('DOMContentLoaded', () => {
+    const modal = document.getElementById('customWaiverModal');
+    
+    // Open Modal
+    document.getElementById('openCustomWaiverBtn').addEventListener('click', () => {
+        // Auto-set the month to the current month as a nice default
+        document.getElementById('cwMonth').value = new Date().getMonth() + 1;
+        modal.style.display = 'flex';
+    });
+
+    // Close Modal
+    document.getElementById('cancelCustomWaiverBtn').addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+
+    // Save & Generate
+    document.getElementById('saveCustomWaiverBtn').addEventListener('click', async () => {
+        const jobId = document.getElementById('cwJobId').value.trim();
+        const vendorId = document.getElementById('cwVendorId').value.trim();
+        const month = document.getElementById('cwMonth').value;
+        const year = document.getElementById('cwYear').value;
+        
+        // Grab the manual overrides (if they left them blank, it defaults to standard math)
+        const customThrough = document.getElementById('cwThrough').value.trim() || null;
+        const customDue = document.getElementById('cwDue').value.trim() || null;
+
+        if (!jobId || !vendorId) {
+            alert("Job ID and Vendor ID are required!");
+            return;
+        }
+
+        try {
+            // Change button text to show it's working
+            const saveBtn = document.getElementById('saveCustomWaiverBtn');
+            saveBtn.textContent = "Saving...";
+            saveBtn.disabled = true;
+
+            // 1. Run our engine to build the row
+            const newRow = prepareNewWaiver(jobId, vendorId, month, year, customThrough, customDue);
+
+            // 2. Grab the master waivers file
+            const fileHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.waivers);
+            
+            // 3. Smart Merge it into Excel
+            await UpdateExcel(fileHandle, [newRow], "Waiver ID", "Waivers"); // Adjust sheet name if needed
+
+            // 4. Update local memory so the UI refreshes instantly without a full reload
+            window.Workspace.appData.waivers.push(newRow);
+            populateMonthDropdown();
+            renderWaiverTable();
+
+            // 5. Cleanup
+            modal.style.display = 'none';
+            saveBtn.textContent = "Generate & Save";
+            saveBtn.disabled = false;
+            
+            // Clear inputs for next time
+            document.getElementById('cwJobId').value = '';
+            document.getElementById('cwVendorId').value = '';
+            document.getElementById('cwThrough').value = '';
+            document.getElementById('cwDue').value = '';
+
+        } catch (error) {
+            console.error("Failed to generate custom waiver:", error);
+            alert("Error saving waiver. Check console for details.");
+            document.getElementById('saveCustomWaiverBtn').textContent = "Generate & Save";
+            document.getElementById('saveCustomWaiverBtn').disabled = false;
+        }
+    });
+});
