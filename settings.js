@@ -63,18 +63,28 @@ window.addEventListener('DOMContentLoaded', async () => {
             window.Workspace.dirHandle = storedHandle;
             document.getElementById('navStatus').innerHTML = `🟢 ${storedHandle.name}`;
             
-            // Wait for the dropdown to build first
             await populateUserDropdown();
             
-            // --- NEW: Check for saved user session ---
+            // --- Auto-Login Sequence ---
             const savedUser = localStorage.getItem('activeUser');
+            const savedPin = localStorage.getItem('activePin');
             
-            if (savedUser) {
-                console.log(`Welcome back, ${savedUser}!`);
-                // Skip the login screen and go straight to the workspace
-                switchView('processingWorkspace'); 
+            if (savedUser && savedPin) {
+                console.log(`Silently logging in ${savedUser}...`);
+                
+                // Re-run the critical startup functions
+                window.Workspace.settings = await loadUserProfile(savedUser, savedPin);
+                window.Workspace.currentUser = savedUser;
+                applyTheme(window.Workspace.settings.theme || 'light');
+                document.getElementById('welcomeText').textContent = `Welcome, ${savedUser}!`;
+                
+                switchView('processingWorkspace');
+                
+                const subtitle = document.querySelector('.hub-section .subtitle');
+                subtitle.textContent = "Loading spreadsheet data... ⏳";
+                await loadDataset();
+                subtitle.textContent = "All data loaded. Select a tool to begin.";
             } else {
-                // No saved user found, so show the login screen
                 switchView('authContainer');
             }
         }
@@ -233,18 +243,22 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
         window.Workspace.settings = await loadUserProfile(user, pin);
         window.Workspace.currentUser = user;
         
+        // --- NEW: Save the session so it survives a refresh ---
+        localStorage.setItem('activeUser', user);
+        localStorage.setItem('activePin', pin); 
+        // ------------------------------------------------------
+        
         applyTheme(window.Workspace.settings.theme || 'light');
         document.getElementById('welcomeText').textContent = `Welcome, ${user}!`;
         switchView('processingWorkspace');
 
-        // --- NEW: Trigger Data Load ---
+        // --- Trigger Data Load ---
         const subtitle = document.querySelector('.hub-section .subtitle');
         subtitle.textContent = "Loading spreadsheet data... ⏳";
         
-        await loadDataset(); // Triggers your function from dataLoader.js
+        await loadDataset(); 
         
         subtitle.textContent = "All data loaded. Select a tool to begin.";
-        // ------------------------------
         
     } catch (error) {
         alert(error.message);
