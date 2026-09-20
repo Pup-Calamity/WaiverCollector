@@ -20,6 +20,24 @@ async function findExcelFile(baseDirHandle, fileNameOrKeyword) {
     return null; 
 }
 
+async function getFileByPath(baseHandle, fullPath) {
+    // Split the path (e.g., "Folder/Subfolder/file.xlsx")
+    const parts = fullPath.split('/').filter(p => p.trim() !== '');
+    const fileName = parts.pop(); // The last item is the file name
+    let currentDir = baseHandle;
+
+    try {
+        // Walk down the folders
+        for (const folderName of parts) {
+            currentDir = await currentDir.getDirectoryHandle(folderName);
+        }
+        // Grab the file
+        return await currentDir.getFileHandle(fileName);
+    } catch (error) {
+        return null; // Return null if the path or file is broken
+    }
+}
+
 async function getSubfolderHandle(baseHandle, folderPath) {
     // If no path is provided, just return the main folder
     if (!folderPath || folderPath === '') return baseHandle;
