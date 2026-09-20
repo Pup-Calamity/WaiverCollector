@@ -3,58 +3,310 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Tools</title>
-    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <title>Team Workspace Hub</title>
+    
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
-        nav { margin-bottom: 20px; font-weight: bold; }
-        nav a { margin-right: 15px; color: #0056b3; text-decoration: none; }
-        nav a:hover { text-decoration: underline; }
-        .card { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        button { padding: 10px 15px; cursor: pointer; margin: 5px 5px 15px 0; background: #0056b3; color: white; border: none; border-radius: 4px; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        input { padding: 8px; margin: 0 10px 10px 0; }
-        #output { background: #1e1e1e; color: #4af626; padding: 15px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; height: 150px; overflow-y: auto; }
+        /* --- CSS Variables for Light Mode (Default) --- */
+        :root {
+            --brand-color: #6366f1; /* Vibrant Indigo */
+            --brand-hover: #4f46e5;
+            --bg-color: #f8fafc;
+            --surface-color: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+            --hover-shadow: 0 20px 25px -5px rgba(99, 102, 241, 0.15);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* --- CSS Variables for Dark Mode --- */
+        [data-theme="dark"] {
+            --brand-color: #818cf8;
+            --brand-hover: #6366f1;
+            --bg-color: #0f172a; /* Deep slate */
+            --surface-color: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            --hover-shadow: 0 20px 25px -5px rgba(129, 140, 248, 0.15);
+        }
+
+        /* --- Global Reset & Body --- */
+        body {
+            font-family: -apple-system, system-ui, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* --- Navigation --- */
+        nav {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            justify-content: space-between; /* Space between status and theme toggle */
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .status-pill {
+            background: var(--surface-color);
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 0.85em;
+            font-weight: 600;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+            transition: var(--transition);
+        }
+
+        .icon-btn {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            transition: var(--transition);
+        }
+        
+        .icon-btn:hover {
+            border-color: var(--brand-color);
+            color: var(--brand-color);
+            transform: rotate(15deg);
+        }
+
+        /* --- Containers --- */
+        .view-section {
+            display: none;
+            width: 100%;
+            max-width: 400px;
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+        
+        .view-section.active {
+            display: block;
+        }
+
+        .hub-section {
+            max-width: 900px;
+        }
+
+        .card {
+            background: var(--surface-color);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border-color);
+            text-align: center;
+            transition: var(--transition);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- Typography & Forms --- */
+        h2 { margin: 0 0 8px 0; font-size: 1.6em; }
+        p.subtitle { color: var(--text-muted); margin-bottom: 25px; font-size: 0.95em; }
+
+        input, select {
+            width: 100%;
+            padding: 14px;
+            margin-bottom: 20px;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-main);
+            box-sizing: border-box;
+            transition: var(--transition);
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--brand-color);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        button.primary-btn {
+            background-color: var(--brand-color);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            transition: var(--transition);
+        }
+        
+        button.primary-btn:hover {
+            background-color: var(--brand-hover);
+            transform: translateY(-2px);
+        }
+
+        a { color: var(--brand-color); text-decoration: none; font-weight: 600; }
+        a:hover { text-decoration: underline; }
+
+        /* --- Tool Grid (The Dashboard) --- */
+        .tool-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 25px;
+            margin-top: 30px;
+        }
+
+        .tool-card {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 25px;
+            text-align: left;
+            box-shadow: var(--card-shadow);
+            transition: var(--transition);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tool-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--brand-color);
+            box-shadow: var(--hover-shadow);
+        }
+
+        .tool-icon {
+            font-size: 2em;
+            margin-bottom: 15px;
+        }
+
+        .tool-card h3 { margin: 0 0 10px 0; font-size: 1.2em; }
+        .tool-card p { color: var(--text-muted); font-size: 0.9em; flex-grow: 1; margin: 0 0 20px 0; line-height: 1.4; }
+        
+        .launch-link {
+            color: var(--brand-color);
+            font-weight: bold;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
     </style>
 </head>
 <body>
-    <!-- The Connection Card -->
-    <div class="card" id="connectionCard">
-        <h2>System Connection</h2>
-        <p>Please connect your local Master AR Folder to continue.</p>
-        <button id="connectFolderBtn">Connect Master AR Folder</button>
+
+    <!-- Top Navigation -->
+    <nav>
+        <div id="navStatus" class="status-pill">🔴 Disconnected</div>
+        <button id="themeToggle" class="icon-btn" title="Toggle Dark Mode">🌙</button>
+    </nav>
+
+    <!-- VIEW 1: Connect Folder -->
+    <div id="connectionCard" class="card view-section active">
+        <div style="font-size: 3em; margin-bottom: 10px;">📁</div>
+        <h2>Team Workspace</h2>
+        <p class="subtitle">Select the shared directory to load tools and settings.</p>
+        <button id="connectFolderBtn" class="primary-btn">Connect Folder</button>
     </div>
 
-    <div id="authContainer" style="display: none;" class="card">
-        <h2>Welcome to the Workspace</h2>
+    <!-- VIEW 2: Login -->
+    <div id="authContainer" class="card view-section">
+        <div style="font-size: 3em; margin-bottom: 10px;">👋</div>
+        <h2>Welcome Back</h2>
+        <p class="subtitle">Who is logging in today?</p>
         
-        <!-- Login Section -->
         <div id="loginSection">
-            <label for="userDropdown">Select Profile:</label>
-            <select id="userDropdown">
-                <option value="">-- Choose Profile --</option>
-                <!-- JavaScript will populate this list -->
-            </select>
-            
-            <label for="userPin">PIN:</label>
-            <input type="password" id="userPin" placeholder="Enter PIN">
-            
-            <button id="loginBtn">Log In</button>
-            <p>New to the team? <a href="#" id="showCreateBtn">Create a profile</a></p>
+            <select id="userDropdown"><option value="">-- Select Profile --</option></select>
+            <input type="password" id="userPin" placeholder="Passcode">
+            <button id="loginBtn" class="primary-btn">Log In</button>
+            <p style="margin-top: 20px; font-size: 0.9em; color: var(--text-muted);">
+                New here? <a href="#" id="showCreateBtn">Create Profile</a>
+            </p>
         </div>
-    
-        <!-- Create Profile Section (Hidden by default) -->
+
         <div id="createSection" style="display: none;">
-            <label for="newUsername">Name:</label>
-            <input type="text" id="newUsername" placeholder="e.g. Alex">
-            
-            <label for="newPin">Create PIN:</label>
-            <input type="password" id="newPin" placeholder="Secret PIN">
-            
-            <button id="createProfileBtn">Save & Log In</button>
-            <p><a href="#" id="showLoginBtn">Back to Login</a></p>
+            <input type="text" id="newUsername" placeholder="Your Name">
+            <input type="password" id="newPin" placeholder="Create Passcode">
+            <button id="createProfileBtn" class="primary-btn">Save & Enter</button>
+            <p style="margin-top: 20px; font-size: 0.9em;">
+                <a href="#" id="showLoginBtn">← Back</a>
+            </p>
         </div>
     </div>
+
+    <!-- VIEW 3: Tool Dashboard (The Hub) -->
+    <div id="processingWorkspace" class="view-section hub-section">
+        <h2 id="welcomeText">Welcome to the Hub</h2>
+        <p class="subtitle">Select a tool to launch your workflow.</p>
+        
+        <div class="tool-grid">
+            <!-- Tool 1 -->
+            <div class="tool-card" onclick="alert('Launching Waiver Processor...')">
+                <div class="tool-icon">📝</div>
+                <h3>Waiver Processor</h3>
+                <p>Process vendor lien waivers, check compliance, and update master records.</p>
+                <div class="launch-link">Launch Tool →</div>
+            </div>
+
+            <!-- Tool 2 -->
+            <div class="tool-card" onclick="alert('Launching Invoice Builder...')">
+                <div class="tool-icon">📊</div>
+                <h3>Invoice Automator</h3>
+                <p>Generate batches of Word document invoices from raw Excel data.</p>
+                <div class="launch-link">Launch Tool →</div>
+            </div>
+
+            <!-- Tool 3 -->
+            <div class="tool-card" onclick="alert('Launching Data Dashboard...')">
+                <div class="tool-icon">📈</div>
+                <h3>Finance Dashboard</h3>
+                <p>View high-level project metrics and current accounts receivable status.</p>
+                <div class="launch-link">Launch Tool →</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        // --- Dark/Light Mode Logic ---
+        const themeToggle = document.getElementById('themeToggle');
+        
+        // Check for saved theme in standard browser local storage just for immediate page load
+        if (localStorage.getItem('theme') === 'dark') {
+            document.body.setAttribute('data-theme', 'dark');
+            themeToggle.textContent = '☀️';
+        }
+
+        themeToggle.addEventListener('click', () => {
+            if (document.body.getAttribute('data-theme') === 'dark') {
+                document.body.removeAttribute('data-theme');
+                localStorage.setItem('theme', 'light');
+                themeToggle.textContent = '🌙';
+            } else {
+                document.body.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+                themeToggle.textContent = '☀️';
+            }
+            
+            // Optional: If a user is logged in, you can also save this to their personal config.json!
+            // if (currentUser) { appSettings.theme = localStorage.getItem('theme'); saveUserProfile(...); }
+        });
+    </script>
 </body>
 </html>
