@@ -268,7 +268,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
 document.getElementById('logoutBtn').addEventListener('click', () => {
     // Clear the saved memory
     localStorage.removeItem('activeUser');
-    
+    localStorage.removeItem('activePin');
     // Kick them back to the login screen
     document.getElementById('userPin').value = ''; // Clear the password field
     switchView('authContainer');
