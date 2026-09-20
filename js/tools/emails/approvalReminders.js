@@ -48,13 +48,15 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
         if (matchingInvoices.length > 0) {
             
             const jobData = jobInfo.find(j => String(j["Job ID"]).trim().toLowerCase() === jobId) || {};
+            const burgName = jobData ? jobData["BURG Name"] : "";
             const pcName = jobData["Project Manager"] || 'Unknown PC';
             const omName = jobData["Project Controller"] || 'Unknown OM';
             const jobName = jobData["Job Name"] || '';
 
             const pcEmail = await getEmployeeEmail(pcName, logMsg);
             const omEmail = await getEmployeeEmail(omName, logMsg);
-            const ccEmails = [pcEmail, omEmail].filter(Boolean).join("; ");
+            const toEmail = [pcEmail, omEmail].filter(Boolean).join("; ");
+            const ccEmail = getBurgEmail(burgName, "Billing Coordinator");
 
             const jobAR = openAR.filter(ar => String(ar["Job Number"]).trim().toLowerCase() === jobId);
             let amountOpen = 0;
@@ -118,7 +120,7 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
             const toEmail = ccEmails || "missing-contact@company.com"; 
             const subject = `NOTIFICATION: Potential Payment Delay for ${displayJobId} - ${jobName}`;
 
-            const success = await generateEmailFile(emailFolderHandle, fileName, toEmail, "", subject, htmlBody);
+            const success = await generateEmailFile(emailFolderHandle, fileName, toEmail, ccEmail, subject, htmlBody);
             
             if (success) {
                 logMsg(`✉️ Generated Reminder: ${fileName}.eml`);
