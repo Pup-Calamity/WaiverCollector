@@ -148,14 +148,24 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
     const formattedTargetMonth = String(targetMonth).padStart(2, '0');
     const formattedTargetYear = String(targetYear).trim();
 
+    // This safely handles "08" from Excel and "8" from your HTML as identical.
     const targetWaivers = waivers.filter(w => {
-        const rowMonth = String(w["Month"] || '').trim();
-        const rowYear = String(w["Year"] || '').trim();
+        // Use parseInt on both the Excel data and the HTML input
+        const rowMonth = parseInt(w["Month"]);
+        const rowYear = parseInt(w["Year"]);
         
-        return rowMonth === formattedTargetMonth && rowYear === formattedTargetYear;
+        const filterMonth = parseInt(targetMonth);
+        const filterYear = parseInt(targetYear);
+        
+        // Ensure none of them parsed as NaN (Not a Number) before comparing
+        if (isNaN(rowMonth) || isNaN(rowYear) || isNaN(filterMonth) || isNaN(filterYear)) {
+            return false; 
+        }
+
+        return (rowMonth === filterMonth) && (rowYear === filterYear);
     });
     
-    logMsg(`🔍 Found ${targetWaivers.length} waivers for ${formattedTargetMonth}/${formattedTargetYear}. Scanning for stuck invoices...`);
+    logMsg(`🔍 Found ${targetWaivers.length} waivers for ${targetMonth}/${targetYear}. Scanning for stuck invoices...`);
     if (targetWaivers.length === 0) return;
 
     let emailCount = 0;
