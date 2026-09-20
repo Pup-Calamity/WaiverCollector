@@ -117,7 +117,6 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
             `;
 
             const fileName = `ApprovalReminder_${displayJobId}`; 
-            const toEmail = ccEmails || "missing-contact@company.com"; 
             const subject = `NOTIFICATION: Potential Payment Delay for ${displayJobId} - ${jobName}`;
 
             const success = await generateEmailFile(emailFolderHandle, fileName, toEmail, ccEmail, subject, htmlBody);
