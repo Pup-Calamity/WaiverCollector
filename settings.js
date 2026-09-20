@@ -22,6 +22,7 @@ window.Workspace = {
         nonPaymentList: [],
         WIP: [],
         noticeTracker: [],
+        jobNotes: [],
         billingTracker: []
     }
 };
@@ -43,6 +44,8 @@ window.WORKSPACE_FILE_PATHS = {
     WIP: "Data/MainData/WIP.xlsx",
     noticeTracker: "Data/MainData/Prelim Tracker.xlsx",
     billingTracker: "Data/MainData/Billing Checklist.xlsx",
+    jobNotes: "Data/MainData/Job Notes.xlsx",
+    waiverInvoices: "Data/DailyUpdateData Waiver Invoices.xlsx"
 };
 
 // --- Native Database Setup (IndexedDB for remembering the folder) ---
