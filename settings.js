@@ -321,3 +321,38 @@ document.getElementById('manualSyncBtn').addEventListener('click', async () => {
     syncBtn.textContent = "📥 Sync Data from Excel";
 });
 
+// --- Change Folder Logic ---
+const changeFolderBtn = document.getElementById('changeFolderBtn');
+if (changeFolderBtn) {
+    changeFolderBtn.addEventListener('click', async () => {
+        try {
+            // 1. Open the file picker for the user to select a new folder
+            const newHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+            
+            // 2. Save the new handle to IndexedDB
+            // Note: If your app uses a different function like saveDirectoryHandle(), swap it here!
+            if (typeof setDB === 'function') {
+                await setDB('masterARFolder', newHandle);
+            } else {
+                console.warn("Make sure to save this handle to your IndexedDB setup!");
+            }
+
+            // 3. Update the live workspace variables
+            window.Workspace.dirHandle = newHandle;
+            document.getElementById('navStatus').innerHTML = `🟢 ${newHandle.name}`;
+            
+            // 4. Wipe the old data from memory so files don't mix
+            window.Workspace.appData = {};
+            
+            // 5. Update UI to prompt a fresh sync
+            document.getElementById('syncStatusText').textContent = "Status: New folder linked. Waiting for sync...";
+            const subtitle = document.querySelector('.hub-section .subtitle');
+            if (subtitle) subtitle.textContent = "New workspace connected. Please sync data.";
+
+            alert(`Successfully switched workspace to: ${newHandle.name}`);
+            
+        } catch (err) {
+            console.warn("Folder change cancelled or failed:", err);
+        }
+    });
+}
