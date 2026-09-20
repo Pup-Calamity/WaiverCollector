@@ -55,6 +55,24 @@ const dbPromise = new Promise((resolve, reject) => {
     req.onerror = () => reject(req.error);
 });
 
+window.addEventListener('DOMContentLoaded', () => {
+    // Check if someone is already logged in
+    const savedUser = localStorage.getItem('activeUser');
+    
+    if (savedUser) {
+        // Log them in silently
+        console.log(`Welcome back, ${savedUser}!`);
+        // If you have a global user variable, set it here (e.g., window.currentUser = savedUser)
+        
+        // Skip the auth screen and go straight to the next step 
+        // (Either your folder picker or directly to 'processingWorkspace')
+        switchView('processingWorkspace'); 
+    } else {
+        // No saved user, show the login screen normally
+        switchView('authContainer');
+    }
+});
+
 async function getDB(key) {
     const db = await dbPromise;
     return new Promise((resolve, reject) => {
