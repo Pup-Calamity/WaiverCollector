@@ -130,55 +130,56 @@ ${formattedBase64}
 }
 
 // --- Report: AP03 Approval Reminders ---
+// --- Report: Approval Reminders ---
 async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
-    // 1. Load the necessary data tables from memory
     const waivers = window.Workspace.appData.waivers;
     const invInProcessing = window.Workspace.appData.invInProcessing;
     const jobInfo = window.Workspace.appData.jobInfo;
     const openAR = window.Workspace.appData.openAR;
-    const empInfo = window.Workspace.appData.empInfo;
 
-    if (!waivers || !invInProcessing || !jobInfo || !openAR || !empInfo) {
-        logMsg("Missing required data! Ensure Waivers, InvInProcessing, JobInfo, OpenAR, and EmpInfo are loaded.", true);
+    if (!waivers || !invInProcessing || !jobInfo || !openAR) {
+        logMsg("❌ Missing required data! Please hit 'Sync Data'.", true);
         return;
     }
 
     const emailFolderHandle = await window.Workspace.dirHandle.getDirectoryHandle("Generated_Emails", { create: true });
     
-    // Get waivers for the selected period
-    const targetWaivers = waivers.filter(w => w["Month"] == targetMonth && w["Year"] == targetYear);
-    let count = 0;
+    // 1. Date Matching: Force both to integers to safely match "9" vs "09"
+    const targetWaivers = waivers.filter(w => 
+        parseInt(w["Month"]) === parseInt(targetMonth) && 
+        parseInt(w["Year"]) === parseInt(targetYear)
+    );
+    
+    logMsg(`🔍 Found ${targetWaivers.length} waivers for ${targetMonth}/${targetYear}. Scanning for stuck invoices...`);
+    if (targetWaivers.length === 0) return;
 
-    // Helper function to look up employee emails
-    const getEmail = (empName) => {
-        if (!empName) return "";
-        const emp = empInfo.find(e => String(e["Employee Name"]).trim().toLowerCase() === String(empName).trim().toLowerCase());
-        return emp ? emp["Employee Email"] : "";
-    };
+    let emailCount = 0;
 
     for (const waiver of targetWaivers) {
         const jobId = String(waiver["Job ID"] || '').trim();
         const vendorId = String(waiver["Vendor ID"] || '').trim();
 
-        // 2. Find invoices for this combo that are STRICTLY in the AP03 queue
-        const matchingInvoices = invInProcessing.filter(inv => 
-            String(inv["jobid"]).trim().toLowerCase() === jobId.toLowerCase() &&
-            String(inv["vendorid"]).trim().toLowerCase() === vendorId.toLowerCase() &&
-            String(inv["Queue"]).trim().toLowerCase().includes("ap03") // Matches "AP03 - Approval"
-        );
+        // 2. Find invoices strictly in an "Approval" queue
+        const matchingInvoices = invInProcessing.filter(inv => {
+            const invJob = String(inv["jobid"] || '').trim().toLowerCase();
+            const invVendor = String(inv["vendorid"] || '').trim().toLowerCase();
+            const invQueue = String(inv["Queue"] || '').trim().toLowerCase();
+            
+            return (invJob === jobId.toLowerCase() && 
+                    invVendor === vendorId.toLowerCase() && 
+                    invQueue.includes("approval")); // Catching all "Approval" variations
+        });
 
         if (matchingInvoices.length > 0) {
-            
             // 3. Look up Job and Contact Info
+            const jobData = jobInfo.find(j => String(j["Job ID"]).trim() === jobId) || {};
             const pcName = jobData["Project Manager"] || 'Unknown PC';
             const omName = jobData["Project Controller"] || 'Unknown OM';
-            const burgName = jobData["BURG Name"] || 'Unknown BURG';
             const jobName = jobData["Job Name"] || '';
 
-            // Call the global utility and pass the logMsg so it updates the UI!
+            // Check memory, prompt if missing, save to Excel
             const pcEmail = await getEmployeeEmail(pcName, logMsg);
             const omEmail = await getEmployeeEmail(omName, logMsg);
-            
             const ccEmails = [pcEmail, omEmail].filter(Boolean).join("; ");
 
             // 4. Calculate AR Open Amount & Aging
@@ -188,16 +189,14 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
             let invAge = 0;
             
             jobAR.forEach(ar => {
-                // Parse float, defaulting to 0 if NaN
                 amountOpen += parseFloat(ar["Invoice $ Due"]) || 0; 
-                
                 const currentAge = parseInt(ar["Aging"]) || 0;
                 if (currentAge > invAge) invAge = currentAge;
             });
 
             const formattedAmountOpen = amountOpen.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 
-            // 5. Build the HTML Table for the stuck invoices
+            // 5. Build the HTML Table
             let invoiceRowsHtml = "";
             matchingInvoices.forEach(inv => {
                 const formattedAmount = Number(inv["Amount"]).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
@@ -214,7 +213,7 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
                     </tr>`;
             });
 
-            // 6. Construct the final Email Body
+            // 6. Construct the Email Body
             const htmlBody = `
                 <div style="font-family: Calibri, sans-serif; font-size: 11pt; color: #333;">
                     <p><span style="background-color: #dcfce7; padding: 3px;"><strong>NOTE:</strong> This notification DOES NOT indicate whether your project has been funded, or that the vendor is refusing to sign a waiver. This is to be used as a tool to draw awareness to potential issues that may hold up our payment.</span></p>
@@ -252,22 +251,20 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
                 </div>
             `;
 
-            // Define the email parameters
             const fileName = `ApprovalReminder_${jobId}_${vendorId}`;
             const toEmail = ccEmails || "missing-contact@company.com"; 
             const subject = `NOTIFICATION: Potential Payment Delay for ${jobId} - ${jobName}`;
 
-            // Generate the file
             const success = await generateEmailFile(emailFolderHandle, fileName, toEmail, "", subject, htmlBody);
             
             if (success) {
-                logMsg(`Generated Reminder: ${fileName}.eml`);
-                count++;
+                logMsg(`✉️ Generated Reminder: ${fileName}.eml`);
+                emailCount++;
             }
         }
     }
 
-    logMsg(`✅ Batch Complete! Generated ${count} AP03 Reminders.`);
+    logMsg(`✅ Batch Complete! Generated ${emailCount} Approval Reminders.`);
 }
 
 
