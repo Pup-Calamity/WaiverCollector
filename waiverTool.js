@@ -58,22 +58,26 @@ window.addEventListener('DOMContentLoaded', () => {
 // --- Dynamic Filter Population ---
 function populateMonthDropdown() {
     const monthDropdown = document.getElementById('waiverMonthFilter');
-    monthDropdown.innerHTML = '<option value="ALL">All Months</option>'; // Reset it
+    monthDropdown.innerHTML = '<option value="ALL">All Months</option>'; 
 
     const waivers = window.Workspace.appData.waivers;
     if (!waivers) return;
 
-    // Create a list of unique months from your data
-    const uniqueMonths = [...new Set(waivers.map(w => w["Waiver Month"]).filter(Boolean))];
+    // Dynamically combine Month and Year, filter out any blanks, and get unique values
+    const uniqueMonths = [...new Set(waivers.map(w => {
+        if (w["Month"] && w["Year"]) {
+            return `${w["Month"]}/${w["Year"]}`;
+        }
+        return null;
+    }).filter(Boolean))];
 
-    uniqueMonths.forEach(month => {
+    uniqueMonths.forEach(monthYearStr => {
         const option = document.createElement('option');
-        option.value = month;
-        option.textContent = month;
+        option.value = monthYearStr;
+        option.textContent = monthYearStr;
         monthDropdown.appendChild(option);
     });
 }
-
 // --- Data Rendering & Filtering ---
 function renderWaiverTable() {
     const tbody = document.getElementById('waiverTableBody');
