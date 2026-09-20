@@ -24,7 +24,8 @@ window.Workspace = {
         WIP: [],
         noticeTracker: [],
         jobNotes: [],
-        billingTracker: []
+        billingTracker: [],
+        burgEmails: []
     }
 };
 
@@ -46,7 +47,8 @@ window.WORKSPACE_FILE_PATHS = {
     noticeTracker: "Data/MainData/Prelim Tracker.xlsx",
     billingTracker: "Data/MainData/Billing Checklist.xlsx",
     jobNotes: "Data/MainData/Job Notes.xlsx",
-    waiverInvoices: "Data/DailyUpdateData/Waiver Invoices.xlsx"
+    waiverInvoices: "Data/DailyUpdateData/Waiver Invoices.xlsx",
+    burgEmails: "Data/MainData/Burg Emails.xlsx",
 };
 
 // --- UI Navigation Helpers ---
