@@ -152,26 +152,31 @@ function openWaiverDetails(waiverId) {
 }
 
 
-function prepareNewWaiver(jobId, vendorId, targetMonth, targetYear) {
+// Added customThroughPeriod and customDueDate as optional parameters (defaulting to null)
+function prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, customThroughPeriod = null, customDueDate = null) {
+    
     // 1. Grab the job settings from your in-memory hub
     const jobSettings = window.Workspace.appData.jobNotes.find(j => j["Job ID"] === jobId);
     
-    // 2. Fallbacks just in case the job isn't set up yet
-    const dueDay = jobSettings ? jobSettings["Due Day"] : null;
+    const dueDayOffset = jobSettings ? jobSettings["Due Day"] : null;
     const throughDay = jobSettings ? jobSettings["Through Day"] : null;
 
-    // 3. Run the date math
-    const timing = calculateWaiverDates(targetMonth, targetYear, dueDay, throughDay);
+    // 2. Run the standard date math as a baseline
+    const timing = calculateWaiverDates(targetMonth, targetYear, dueDayOffset, throughDay);
 
-    // 4. Build your row (Make sure to add these headers to your Excel file!)
+    // 3. THE OVERRIDE: Use the custom human input if it exists; otherwise, use the math
+    const finalThroughPeriod = customThroughPeriod ? customThroughPeriod : timing.throughPeriod;
+    const finalDueDate = customDueDate ? customDueDate : timing.dueDate;
+
+    // 4. Build the row
     const newWaiverRow = {
-        "Waiver ID": generateWaiverKey(jobId, vendorId, targetMonth, targetYear),
+        "Waiver ID": generateWaiverKey(jobId, vendorId, targetMonth, targetYear), // Auto-increments to 2, 3, etc.
         "Job ID": jobId,
         "Vendor ID": vendorId,
         "Month": targetMonth,
         "Year": targetYear,
-        "Due Date": timing.dueDate,             // e.g. "9/20/2026"
-        "Through Period": timing.throughPeriod, // e.g. "8/16/2026 to 9/15/2026"
+        "Due Date": finalDueDate,             
+        "Through Period": finalThroughPeriod, 
         "Status": "Pending"
     };
 
