@@ -1,0 +1,116 @@
+/* css/components.css */
+
+/* --- Layout Containers --- */
+.view-section {
+    display: none;
+    width: 100%;
+    max-width: 400px;
+    animation: fadeIn 0.4s ease-out forwards;
+}
+
+.view-section.active { display: block; }
+.hub-section { max-width: 900px; }
+
+.card {
+    background: var(--surface-color);
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: var(--card-shadow);
+    border: 1px solid var(--border-color);
+    text-align: center;
+    transition: var(--transition);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Forms & Buttons --- */
+input, select {
+    width: 100%;
+    padding: 14px;
+    margin-bottom: 20px;
+    background-color: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    color: var(--text-main);
+    box-sizing: border-box;
+    transition: var(--transition);
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: var(--brand-color);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+button.primary-btn {
+    background-color: var(--brand-color);
+    color: white;
+    border: none;
+    padding: 14px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: bold;
+    width: 100%;
+    transition: var(--transition);
+}
+
+button.primary-btn:hover {
+    background-color: var(--brand-hover);
+    transform: translateY(-2px);
+}
+
+.icon-btn {
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2em;
+    transition: var(--transition);
+}
+
+.icon-btn:hover {
+    border-color: var(--brand-color);
+    color: var(--brand-color);
+    transform: rotate(15deg);
+}
+
+/* --- Tool Grid (The Dashboard) --- */
+.tool-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 25px;
+    margin-top: 30px;
+}
+
+.tool-card {
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 25px;
+    text-align: left;
+    box-shadow: var(--card-shadow);
+    transition: var(--transition);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+}
+
+.tool-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--brand-color);
+    box-shadow: var(--hover-shadow);
+}
+
+.tool-icon { font-size: 2em; margin-bottom: 15px; }
+.tool-card h3 { margin: 0 0 10px 0; font-size: 1.2em; }
+.tool-card p { color: var(--text-muted); font-size: 0.9em; flex-grow: 1; margin: 0 0 20px 0; line-height: 1.4; }
+.launch-link { color: var(--brand-color); font-weight: bold; font-size: 0.9em; display: flex; align-items: center; gap: 5px; }
