@@ -1,6 +1,19 @@
 // Global variable to track who is currently logged in
 let currentUser = null;
 
+async function setupDirectory(handle) {
+    dirHandle = handle;
+    
+    // Hide the initial connect button
+    document.getElementById('connectionCard').style.display = 'none';
+    
+    // Show the login screen and populate it with team members
+    document.getElementById('authContainer').style.display = 'block';
+    await populateUserDropdown(dirHandle);
+    
+    const navStatus = document.getElementById('navStatus');
+    if (navStatus) navStatus.textContent = `✅ Connected: ${dirHandle.name}`;
+}
 // --- UI Toggles ---
 document.getElementById('showCreateBtn').addEventListener('click', (e) => {
     e.preventDefault();
