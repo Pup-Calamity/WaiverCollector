@@ -43,6 +43,23 @@ async function getEmployeeEmail(empName, logMsg = console.log) {
     return "";
 }
 
+function getBurgEmail(burgName, roleName) {
+    const burgData = window.Workspace.appData.burgEmails;
+    if (!burgData || !burgName) return "";
+
+    const cleanBurgName = String(burgName).trim().toLowerCase();
+    
+    const matchedBurg = burgData.find(row => 
+        String(row["Burg"] || '').trim().toLowerCase() === cleanBurgName
+    );
+
+    if (matchedBurg && matchedBurg[roleName]) {
+        return String(matchedBurg[roleName]).trim();
+    }
+    
+    return "";
+}
+
 // --- Date Utilities ---
 function getTodayString() {
     const today = new Date();
