@@ -170,14 +170,15 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
         if (matchingInvoices.length > 0) {
             
             // 3. Look up Job and Contact Info
-            const jobData = jobInfo.find(j => String(j["Job ID"]).trim() === jobId) || {};
             const pcName = jobData["Project Manager"] || 'Unknown PC';
             const omName = jobData["Project Controller"] || 'Unknown OM';
             const burgName = jobData["BURG Name"] || 'Unknown BURG';
             const jobName = jobData["Job Name"] || '';
 
-            const pcEmail = getEmail(pcName);
-            const omEmail = getEmail(omName);
+            // Call the global utility and pass the logMsg so it updates the UI!
+            const pcEmail = await getEmployeeEmail(pcName, logMsg);
+            const omEmail = await getEmployeeEmail(omName, logMsg);
+            
             const ccEmails = [pcEmail, omEmail].filter(Boolean).join("; ");
 
             // 4. Calculate AR Open Amount & Aging
@@ -267,4 +268,59 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
     }
 
     logMsg(`✅ Batch Complete! Generated ${count} AP03 Reminders.`);
+}
+
+
+// --- Global Email Lookup Utility ---
+async function getEmployeeEmail(empName, logMsg = console.log) {
+    if (!empName || empName.includes('Unknown')) return "";
+    
+    // Grab the global memory block
+    const empInfo = window.Workspace.appData.empInfo;
+    if (!empInfo) return ""; 
+
+    // 1. Check if they exist in memory
+    const emp = empInfo.find(e => String(e["Employee Name"]).trim().toLowerCase() === String(empName).trim().toLowerCase());
+    
+    if (emp && emp["Employee Email"]) {
+        return emp["Employee Email"];
+    }
+
+    // 2. If missing, pause the app and ask the user
+    const newEmail = prompt(`Missing email for Project Contact: ${empName}\n\nPlease enter their email address to save it to the database:`);
+    
+    if (newEmail && newEmail.trim() !== "") {
+        const cleanEmail = newEmail.trim();
+        
+        // 3. Build the new record using your exact headers
+        const newEmpRecord = {
+            "Emp ID": "TBD", 
+            "Employee Name": empName,
+            "Employee Email": cleanEmail,
+            "Employee Office": "",
+            "Employee Cell": ""
+        };
+
+        // 4. Update live memory so it doesn't ask again this session
+        empInfo.push(newEmpRecord);
+        
+        // 5. Save permanently to Excel
+        try {
+            // NOTE: Make sure window.WORKSPACE_FILE_PATHS.empInfo matches your setup!
+            const fileHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.empInfo);
+            
+            // Assuming your sheet is named "empInfo" or "Employees"
+            await UpdateExcel(fileHandle, [newEmpRecord], "Employee Name", "empInfo"); 
+            
+            logMsg(`➕ Saved new email for ${empName} to database.`);
+        } catch (err) {
+            console.warn("Failed to write new employee to Excel:", err);
+            logMsg(`⚠️ Added ${empName} to memory, but failed to save to Excel.`, true);
+        }
+
+        return cleanEmail;
+    }
+
+    // 6. If they hit cancel, just return blank
+    return "";
 }
