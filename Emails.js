@@ -145,12 +145,17 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
     const emailFolderHandle = await window.Workspace.dirHandle.getDirectoryHandle("Generated_Emails", { create: true });
     
     // 1. Date Matching: Force both to integers to safely match "9" vs "09"
-    const targetWaivers = waivers.filter(w => 
-        parseInt(w["Month"]) === parseInt(targetMonth) && 
-        parseInt(w["Year"]) === parseInt(targetYear)
-    );
+    const formattedTargetMonth = String(targetMonth).padStart(2, '0');
+    const formattedTargetYear = String(targetYear).trim();
+
+    const targetWaivers = waivers.filter(w => {
+        const rowMonth = String(w["Month"] || '').trim();
+        const rowYear = String(w["Year"] || '').trim();
+        
+        return rowMonth === formattedTargetMonth && rowYear === formattedTargetYear;
+    });
     
-    logMsg(`🔍 Found ${targetWaivers.length} waivers for ${targetMonth}/${targetYear}. Scanning for stuck invoices...`);
+    logMsg(`🔍 Found ${targetWaivers.length} waivers for ${formattedTargetMonth}/${formattedTargetYear}. Scanning for stuck invoices...`);
     if (targetWaivers.length === 0) return;
 
     let emailCount = 0;
