@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WaiverIO - Processor</title>
+    <title>AR Tools</title>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <style>
@@ -19,12 +19,6 @@
     </style>
 </head>
 <body>
-    <nav>
-        <span>Waiver Processor</span> | 
-        <a href="mapper.html">Visual Template Mapper &rarr;</a>
-        <span id="navStatus" style="float: right; color: #28a745; font-weight: bold;"></span>
-    </nav>
-
     <!-- The Connection Card -->
     <div class="card" id="connectionCard">
         <h2>System Connection</h2>
@@ -32,15 +26,35 @@
         <button id="connectFolderBtn">Connect Master AR Folder</button>
     </div>
 
-    <!-- The Workspace (Hidden until connected) -->
-    <div class="card" id="processingWorkspace" style="display: none;">
-        <h2>Waiver Processing Engine</h2>
-        <input type="text" id="jobInput" placeholder="Job Number (e.g., 12345)">
-        <input type="text" id="vendorInput" placeholder="Vendor Name">
-        <button id="processWaiverBtn">Generate Waiver & Email Draft</button>
-        <div id="output" style="margin-top: 15px;">System Ready. Enter Job and Vendor.</div>
+    <div id="authContainer" style="display: none;" class="card">
+        <h2>Welcome to the Workspace</h2>
+        
+        <!-- Login Section -->
+        <div id="loginSection">
+            <label for="userDropdown">Select Profile:</label>
+            <select id="userDropdown">
+                <option value="">-- Choose Profile --</option>
+                <!-- JavaScript will populate this list -->
+            </select>
+            
+            <label for="userPin">PIN:</label>
+            <input type="password" id="userPin" placeholder="Enter PIN">
+            
+            <button id="loginBtn">Log In</button>
+            <p>New to the team? <a href="#" id="showCreateBtn">Create a profile</a></p>
+        </div>
+    
+        <!-- Create Profile Section (Hidden by default) -->
+        <div id="createSection" style="display: none;">
+            <label for="newUsername">Name:</label>
+            <input type="text" id="newUsername" placeholder="e.g. Alex">
+            
+            <label for="newPin">Create PIN:</label>
+            <input type="password" id="newPin" placeholder="Secret PIN">
+            
+            <button id="createProfileBtn">Save & Log In</button>
+            <p><a href="#" id="showLoginBtn">Back to Login</a></p>
+        </div>
     </div>
-
-    <script type="module" src="./app.js"></script>
 </body>
 </html>
