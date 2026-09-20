@@ -150,3 +150,74 @@ function renderWaiverTable() {
 function openWaiverDetails(waiverId) {
     console.log(`Opening details for Waiver: ${waiverId}`);
 }
+
+
+function prepareNewWaiver(jobId, vendorId, targetMonth, targetYear) {
+    // 1. Grab the job settings from your in-memory hub
+    const jobSettings = window.Workspace.appData.jobNotes.find(j => j["Job ID"] === jobId);
+    
+    // 2. Fallbacks just in case the job isn't set up yet
+    const dueDay = jobSettings ? jobSettings["Due Day"] : null;
+    const throughDay = jobSettings ? jobSettings["Through Day"] : null;
+
+    // 3. Run the date math
+    const timing = calculateWaiverDates(targetMonth, targetYear, dueDay, throughDay);
+
+    // 4. Build your row (Make sure to add these headers to your Excel file!)
+    const newWaiverRow = {
+        "Waiver ID": generateWaiverKey(jobId, vendorId, targetMonth, targetYear),
+        "Job ID": jobId,
+        "Vendor ID": vendorId,
+        "Month": targetMonth,
+        "Year": targetYear,
+        "Due Date": timing.dueDate,             // e.g. "9/20/2026"
+        "Through Period": timing.throughPeriod, // e.g. "8/16/2026 to 9/15/2026"
+        "Status": "Pending"
+    };
+
+    return newWaiverRow;
+}
+
+// --- Date Calculator for Waivers ---
+function calculateWaiverDates(targetMonth, targetYear, dueDayOffset, throughDay) {
+    // JavaScript months are 0-11, so we subtract 1 from your target
+    const monthIndex = parseInt(targetMonth) - 1; 
+    
+    // 1. Calculate the Due Date
+    // Passing '0' for the day automatically gets the LAST day of the previous month index.
+    // So if target is Sept (index 8), passing index 9 with day 0 returns Sept 30th.
+    const endOfTargetMonth = new Date(targetYear, monthIndex + 1, 0);
+    
+    // Default to 45 days if the setting is blank/null
+    const daysToAdd = dueDayOffset ? parseInt(dueDayOffset) : 45;
+    
+    // Add the days to the end of the month
+    const dueDate = new Date(endOfTargetMonth);
+    dueDate.setDate(dueDate.getDate() + daysToAdd);
+    const dueDateStr = dueDate.toLocaleDateString();
+
+    // 2. Calculate the "Through Period"
+    let throughPeriodStr = "";
+    if (throughDay) {
+        const tDay = parseInt(throughDay);
+        
+        // Period End: Target Month, Target Day (e.g., Sep 15)
+        const periodEnd = new Date(targetYear, monthIndex, tDay);
+        
+        // Period Start: PREVIOUS Month, Target Day + 1 (e.g., Aug 16)
+        const periodStart = new Date(targetYear, monthIndex - 1, tDay + 1);
+        
+        throughPeriodStr = `${periodStart.toLocaleDateString()} to ${periodEnd.toLocaleDateString()}`;
+    } else {
+        // If blank, default to standard full month
+        const periodStart = new Date(targetYear, monthIndex, 1);
+        const periodEnd = new Date(targetYear, monthIndex + 1, 0); 
+        
+        throughPeriodStr = `${periodStart.toLocaleDateString()} to ${periodEnd.toLocaleDateString()}`;
+    }
+
+    return {
+        dueDate: dueDateStr,
+        throughPeriod: throughPeriodStr
+    };
+}
