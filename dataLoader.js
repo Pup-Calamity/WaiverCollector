@@ -37,7 +37,6 @@ async function loadDataset() {
     await Promise.all(loadTasks);
     console.log("Entire database loaded!", window.Workspace.appData);
 }
-
 // --- Developer Utility: Generate Header Map ---
 async function generateHeaderMap() {
     console.log("Scanning files for headers...");
@@ -50,14 +49,20 @@ async function generateHeaderMap() {
             const fileHandle = await getFileByPath(window.Workspace.dirHandle, targetPath);
             
             if (fileHandle) {
-                // Read the file using your existing parser
-                const data = await extractAndValidateData(fileHandle);
+                // Read the file manually to bypass the empty-data check
+                const file = await fileHandle.getFile();
+                const buffer = await file.arrayBuffer();
+                const workbook = XLSX.read(buffer, { type: 'array' });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
                 
-                if (data && data.length > 0) {
-                    // Object.keys grabs all the column names from the first row
-                    headerMap[dataKey] = Object.keys(data[0]);
+                // { header: 1 } forces it to return an array of raw rows. 
+                // allRows[0] will be your header row, even if there's no data below it!
+                const allRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                
+                if (allRows.length > 0 && allRows[0].length > 0) {
+                    headerMap[dataKey] = allRows[0];
                 } else {
-                    headerMap[dataKey] = ["⚠️ File exists but is empty"];
+                    headerMap[dataKey] = ["⚠️ Completely blank sheet (not even headers)"];
                 }
             } else {
                 headerMap[dataKey] = ["❌ File not found"];
@@ -68,7 +73,6 @@ async function generateHeaderMap() {
     }
 
     console.log("=== COPY AND PASTE THE OUTPUT BELOW ===");
-    // Stringify makes it perfectly formatted for copying
     console.log(JSON.stringify(headerMap, null, 4));
     
     return headerMap;
