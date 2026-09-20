@@ -47,10 +47,9 @@ window.addEventListener('DOMContentLoaded', () => {
             runBtn.textContent = "Processing...";
 
             try {
-                if (reportType === "INV_PROCESSING") {
-                    logMsg(`Starting Invoices In Processing batch for ${targetMonth}/${targetYear}...`);
-                    // We will adapt our previous function to return a count and use the logMsg
-                    await batchProcessInvoicesEmail(targetMonth, targetYear, logMsg);
+                if (reportType === "APPROVAL_REMINDERS") {
+                    logMsg(`Starting AP03 Approval Reminders for ${targetMonth}/${targetYear}...`);
+                    await batchProcessApprovalReminders(targetMonth, targetYear, logMsg);
                 } else {
                     logMsg(`Report type ${reportType} is not set up yet.`, true);
                 }
@@ -64,64 +63,6 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
-
-// Updated signature to accept the UI logger
-async function batchProcessInvoicesEmail(targetMonth, targetYear, logMsg) {
-    const waivers = window.Workspace.appData.waivers;
-    const invoices = window.Workspace.appData.invInProcessing;
-
-    if (!waivers || !invoices) {
-        logMsg("Missing data in memory hub! Please ensure all files are loaded.", true);
-        return;
-    }
-
-    const emailFolderHandle = await window.Workspace.dirHandle.getDirectoryHandle("Generated_Emails", { create: true });
-    const targetWaivers = waivers.filter(w => w["Month"] == targetMonth && w["Year"] == targetYear);
-    let count = 0;
-
-    for (const waiver of targetWaivers) {
-        const jobId = String(waiver["Job ID"]).trim();
-        const vendorId = String(waiver["Vendor ID"]).trim();
-
-        const matchingInvoices = invoices.filter(inv => 
-            String(inv["jobid"]).trim().toLowerCase() === jobId.toLowerCase() &&
-            String(inv["vendorid"]).trim().toLowerCase() === vendorId.toLowerCase()
-        );
-
-        if (matchingInvoices.length > 0) {
-            // ... (keep the same HTML body builder logic from earlier) ...
-            const htmlBody = `...`; // (Omitted for brevity, use the one from before)
-
-            const fileName = `WaiverRequest_${jobId}_${vendorId}`;
-            
-            // Try to generate the file
-            const success = await generateEmailFile(emailFolderHandle, fileName, "vendor@example.com", "manager@company.com", `Action Required: Lien Waiver for ${jobId}`, htmlBody);
-            
-            if (success) {
-                logMsg(`Generated: ${fileName}.eml`);
-                count++;
-            } else {
-                logMsg(`Failed: ${fileName}.eml`, true);
-            }
-        }
-    }
-
-    logMsg(`✅ Batch Complete! Successfully saved ${count} email drafts to the 'Generated_Emails' folder.`);
-}
-
-// Helper to convert a file into a Base64 string for the email attachment
-async function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-            // Extracts just the base64 string, removing the "data:application/pdf;base64," prefix
-            const base64String = reader.result.split(',')[1];
-            resolve(base64String);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-}
 
 // --- Upgraded Multipart EML Generator ---
 // added 'attachmentHandles' as an optional array of FileSystemFileHandle objects
@@ -186,4 +127,144 @@ ${formattedBase64}
         console.error(`❌ Failed to save email ${fileName}:`, error);
         return false;
     }
+}
+
+// --- Report: AP03 Approval Reminders ---
+async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
+    // 1. Load the necessary data tables from memory
+    const waivers = window.Workspace.appData.waivers;
+    const invInProcessing = window.Workspace.appData.invInProcessing;
+    const jobInfo = window.Workspace.appData.jobInfo;
+    const openAR = window.Workspace.appData.openAR;
+    const empInfo = window.Workspace.appData.empInfo;
+
+    if (!waivers || !invInProcessing || !jobInfo || !openAR || !empInfo) {
+        logMsg("Missing required data! Ensure Waivers, InvInProcessing, JobInfo, OpenAR, and EmpInfo are loaded.", true);
+        return;
+    }
+
+    const emailFolderHandle = await window.Workspace.dirHandle.getDirectoryHandle("Generated_Emails", { create: true });
+    
+    // Get waivers for the selected period
+    const targetWaivers = waivers.filter(w => w["Month"] == targetMonth && w["Year"] == targetYear);
+    let count = 0;
+
+    // Helper function to look up employee emails
+    const getEmail = (empName) => {
+        if (!empName) return "";
+        const emp = empInfo.find(e => String(e["Employee Name"]).trim().toLowerCase() === String(empName).trim().toLowerCase());
+        return emp ? emp["Employee Email"] : "";
+    };
+
+    for (const waiver of targetWaivers) {
+        const jobId = String(waiver["Job ID"] || '').trim();
+        const vendorId = String(waiver["Vendor ID"] || '').trim();
+
+        // 2. Find invoices for this combo that are STRICTLY in the AP03 queue
+        const matchingInvoices = invInProcessing.filter(inv => 
+            String(inv["jobid"]).trim().toLowerCase() === jobId.toLowerCase() &&
+            String(inv["vendorid"]).trim().toLowerCase() === vendorId.toLowerCase() &&
+            String(inv["Queue"]).trim().toLowerCase().includes("ap03") // Matches "AP03 - Approval"
+        );
+
+        if (matchingInvoices.length > 0) {
+            
+            // 3. Look up Job and Contact Info
+            const jobData = jobInfo.find(j => String(j["Job ID"]).trim() === jobId) || {};
+            const pcName = jobData["Project Manager"] || 'Unknown PC';
+            const omName = jobData["Project Controller"] || 'Unknown OM';
+            const burgName = jobData["BURG Name"] || 'Unknown BURG';
+            const jobName = jobData["Job Name"] || '';
+
+            const pcEmail = getEmail(pcName);
+            const omEmail = getEmail(omName);
+            const ccEmails = [pcEmail, omEmail].filter(Boolean).join("; ");
+
+            // 4. Calculate AR Open Amount & Aging
+            const jobAR = openAR.filter(ar => String(ar["Job Number"]).trim() === jobId);
+            
+            let amountOpen = 0;
+            let invAge = 0;
+            
+            jobAR.forEach(ar => {
+                // Parse float, defaulting to 0 if NaN
+                amountOpen += parseFloat(ar["Invoice $ Due"]) || 0; 
+                
+                const currentAge = parseInt(ar["Aging"]) || 0;
+                if (currentAge > invAge) invAge = currentAge;
+            });
+
+            const formattedAmountOpen = amountOpen.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+
+            // 5. Build the HTML Table for the stuck invoices
+            let invoiceRowsHtml = "";
+            matchingInvoices.forEach(inv => {
+                const formattedAmount = Number(inv["Amount"]).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+                invoiceRowsHtml += `
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ccc;">${pcName} / ${omName}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc;">${jobId}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc;">${inv["invoicenumb"] || ''}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc;">${inv["vendorid"] || ''}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc;">${inv["vendorname"] || ''}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc;">${inv["invoicedate (Day-Month-Year)"] || ''}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc;">${formattedAmount}</td>
+                        <td style="padding: 8px; border: 1px solid #ccc;">${inv["Aging"] || '0'}</td>
+                    </tr>`;
+            });
+
+            // 6. Construct the final Email Body
+            const htmlBody = `
+                <div style="font-family: Calibri, sans-serif; font-size: 11pt; color: #333;">
+                    <p><span style="background-color: #dcfce7; padding: 3px;"><strong>NOTE:</strong> This notification DOES NOT indicate whether your project has been funded, or that the vendor is refusing to sign a waiver. This is to be used as a tool to draw awareness to potential issues that may hold up our payment.</span></p>
+                    
+                    <p>Hello,</p>
+                    <p>The following ${targetMonth}/${targetYear} invoices may prevent the collection of waivers needed to receive payment of <strong>${formattedAmountOpen}</strong> for the Pay App, which is currently <strong>${invAge} days old</strong>.</p>
+                    
+                    <p style="color: #b91c1c;"><strong>If this is more than 30 days old, it is very important to resolve the issues as quickly as possible.</strong></p>
+                    
+                    <ul style="margin-bottom: 20px;">
+                        <li>If you do not believe the issue can be resolved soon, but you feel you can have the vendor sign a waiver without the invoices being resolved, please respond to this email letting us know and we can CC you on the email when the waiver is sent.</li>
+                        <li>Also note that invoices need to be approved by end of day the day before the payment day of your burg. If you are approving invoices on this list, please <strong>Reply ALL</strong> to this email to ensure they can get selected.</li>
+                    </ul>
+
+                    <table style="border-collapse: collapse; width: 100%; margin: 15px 0; font-size: 10pt;">
+                        <thead>
+                            <tr style="background-color: #f3f4f6; text-align: left;">
+                                <th style="padding: 8px; border: 1px solid #ccc;">PC/OM</th>
+                                <th style="padding: 8px; border: 1px solid #ccc;">Job ID</th>
+                                <th style="padding: 8px; border: 1px solid #ccc;">Invoice Number</th>
+                                <th style="padding: 8px; border: 1px solid #ccc;">Vendor ID</th>
+                                <th style="padding: 8px; border: 1px solid #ccc;">Vendor Name</th>
+                                <th style="padding: 8px; border: 1px solid #ccc;">Invoice Date</th>
+                                <th style="padding: 8px; border: 1px solid #ccc;">Amount</th>
+                                <th style="padding: 8px; border: 1px solid #ccc;">Days in Queue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${invoiceRowsHtml}
+                        </tbody>
+                    </table>
+                    
+                    <p>Thank you,</p>
+                    <p>Accounts Payable Team</p>
+                </div>
+            `;
+
+            // Define the email parameters
+            const fileName = `ApprovalReminder_${jobId}_${vendorId}`;
+            const toEmail = ccEmails || "missing-contact@company.com"; 
+            const subject = `NOTIFICATION: Potential Payment Delay for ${jobId} - ${jobName}`;
+
+            // Generate the file
+            const success = await generateEmailFile(emailFolderHandle, fileName, toEmail, "", subject, htmlBody);
+            
+            if (success) {
+                logMsg(`Generated Reminder: ${fileName}.eml`);
+                count++;
+            }
+        }
+    }
+
+    logMsg(`✅ Batch Complete! Generated ${count} AP03 Reminders.`);
 }
