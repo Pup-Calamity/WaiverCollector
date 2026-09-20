@@ -86,33 +86,49 @@ async function extractAndValidateData(fileHandle, expectedHeaders = []) {
     return jsonData;
 }
 
-//Prepare Excel Data for Upload
+// Prepare Excel Data for Upload
 async function UpdateExcel(fileHandle, changedRows, uniqueIdKey, sheetName = "Sheet1") {
     try {
         console.log("Fetching the absolute latest version of the file...");
         
-        // 1. Re-read the file from disk right now, catching anyone else's recent changes
+        // 1. Re-read the file from disk right now
         const latestData = await extractAndValidateData(fileHandle); 
+        
+        // --- NEW: Grab the current user and format the date as mm.dd.yyyy ---
+        const activeUser = window.Workspace.currentUser || "Unknown User";
+        
+        const today = new Date();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const yyyy = today.getFullYear();
+        const todayString = `${mm}/${dd}/${yyyy}`;
+        // --------------------------------------------------------------------
         
         // 2. Loop through only the rows our web app changed
         changedRows.forEach(changedRow => {
-            // Find the matching row in the fresh data using our Unique ID (e.g., "Contract Number")
+            
+            // -- -Auto-stamp the audit trail before merging ---
+            changedRow["Last Updated"] = todayString;
+            changedRow["Updated By"] = activeUser;
+            // ------------------------------------------------------
+
+            // Find the matching row in the fresh data using our Unique ID 
             const rowIndex = latestData.findIndex(row => row[uniqueIdKey] === changedRow[uniqueIdKey]);
             
             if (rowIndex !== -1) {
-                // Object.assign merges our changes into the existing row, 
-                // leaving any other columns someone else might have touched completely alone!
+                // Object.assign merges our changes (and our new timestamps) into the existing row
                 Object.assign(latestData[rowIndex], changedRow);
             } else {
-                // Optional: If the row doesn't exist, it must be new, so add it
+                // If the row doesn't exist, add it
                 latestData.push(changedRow);
             }
         });
         
         // 3. Write this freshly merged data back to the file
         console.log("Saving merged data...");
+        
         await writeDataToExcel(fileHandle, latestData, sheetName);
-        console.log("✅ Smart merge complete!");
+        console.log("✅ Smart merge and audit stamp complete!");
         
     } catch (error) {
         console.error("Failed to merge and save:", error);
