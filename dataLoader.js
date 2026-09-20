@@ -37,3 +37,39 @@ async function loadDataset() {
     await Promise.all(loadTasks);
     console.log("Entire database loaded!", window.Workspace.appData);
 }
+
+// --- Developer Utility: Generate Header Map ---
+async function generateHeaderMap() {
+    console.log("Scanning files for headers...");
+    const headerMap = {};
+    const todayStr = getTodayString(); // Uses your existing mm.dd.yyyy function
+
+    for (const [dataKey, originalPath] of Object.entries(window.WORKSPACE_FILE_PATHS)) {
+        try {
+            const targetPath = originalPath.replace('[TODAY]', todayStr);
+            const fileHandle = await getFileByPath(window.Workspace.dirHandle, targetPath);
+            
+            if (fileHandle) {
+                // Read the file using your existing parser
+                const data = await extractAndValidateData(fileHandle);
+                
+                if (data && data.length > 0) {
+                    // Object.keys grabs all the column names from the first row
+                    headerMap[dataKey] = Object.keys(data[0]);
+                } else {
+                    headerMap[dataKey] = ["⚠️ File exists but is empty"];
+                }
+            } else {
+                headerMap[dataKey] = ["❌ File not found"];
+            }
+        } catch (error) {
+            headerMap[dataKey] = [`❌ Error reading file: ${error.message}`];
+        }
+    }
+
+    console.log("=== COPY AND PASTE THE OUTPUT BELOW ===");
+    // Stringify makes it perfectly formatted for copying
+    console.log(JSON.stringify(headerMap, null, 4));
+    
+    return headerMap;
+}
