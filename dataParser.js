@@ -68,47 +68,6 @@ async function extractAndValidateData(fileHandle, expectedHeaders = []) {
     return jsonData;
 }
 
-//Then Load into the appData for the table its for
-
-// A global object to hold your loaded data
-const appData = {
-    waiverInvoices: [],
-    unpaidInvoices: [],
-    invInProcessing: [],
-    rejectionNotes: [],
-    jobInfo: [],
-    contractInfo: [],
-    templateList: [],
-    empEmails: [],
-    customerInfo: [],
-    vendorInfo: [],
-    waivers: []
-};
-
-async function loadDataset() {
-    try {
-        // Look for a file that is supposed to be named "Vendor_Waivers_Master.xlsx"
-        // But will still find "vendor_waivers_v2.xlsx" due to our partial match logic
-        const waiverFileHandle = await findExcelFile(dirHandle, "Vendor_Waivers");
-        
-        if (!waiverFileHandle) {
-            // TRIGGER MANUAL FILE PICKER HERE
-            console.warn("File not found in the designated folder.");
-            return;
-        }
-
-        // Define the headers you strictly require for your logic to work
-        const requiredHeaders = ["Vendor Name", "Contract Number", "Amount"];
-        
-        // Extract the data
-        appData.waivers = await extractAndValidateData(waiverFileHandle, requiredHeaders);
-        console.log("Waivers loaded successfully!", appData.waivers);
-
-    } catch (error) {
-        console.error("Data loading failed:", error.message);
-    }
-}
-
 //Prepare Excel Data for Upload
 async function UpdateExcel(fileHandle, changedRows, uniqueIdKey, sheetName = "Sheet1") {
     try {
