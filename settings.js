@@ -195,6 +195,16 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
         applyTheme(window.Workspace.settings.theme || 'light');
         document.getElementById('welcomeText').textContent = `Welcome, ${user}!`;
         switchView('processingWorkspace');
+
+        // --- NEW: Trigger Data Load ---
+        const subtitle = document.querySelector('.hub-section .subtitle');
+        subtitle.textContent = "Loading spreadsheet data... ⏳";
+        
+        await loadDataset(); // Triggers your function from dataLoader.js
+        
+        subtitle.textContent = "All data loaded. Select a tool to begin.";
+        // ------------------------------
+        
     } catch (error) {
         alert(error.message);
     }
@@ -215,6 +225,16 @@ document.getElementById('createProfileBtn').addEventListener('click', async () =
         
         document.getElementById('welcomeText').textContent = `Welcome, ${newName}!`;
         switchView('processingWorkspace');
+
+        // --- NEW: Trigger Data Load ---
+        const subtitle = document.querySelector('.hub-section .subtitle');
+        subtitle.textContent = "Loading spreadsheet data... ⏳";
+        
+        await loadDataset(); 
+        
+        subtitle.textContent = "All data loaded. Select a tool to begin.";
+        // ------------------------------
+
     } catch (error) {
         alert("Failed to create profile: " + error.message);
     }
