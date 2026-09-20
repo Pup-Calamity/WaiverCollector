@@ -22,7 +22,6 @@ async function set(key, val) {
         tx.oncomplete = () => resolve();
     });
 }
-
 // --- 2. Global State ---
 let dirHandle;
 let appData = {
