@@ -55,21 +55,31 @@ const dbPromise = new Promise((resolve, reject) => {
     req.onerror = () => reject(req.error);
 });
 
-window.addEventListener('DOMContentLoaded', () => {
-    // Check if someone is already logged in
-    const savedUser = localStorage.getItem('activeUser');
-    
-    if (savedUser) {
-        // Log them in silently
-        console.log(`Welcome back, ${savedUser}!`);
-        // If you have a global user variable, set it here (e.g., window.currentUser = savedUser)
+window.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const storedHandle = await getDB('masterARFolder');
         
-        // Skip the auth screen and go straight to the next step 
-        // (Either your folder picker or directly to 'processingWorkspace')
-        switchView('processingWorkspace'); 
-    } else {
-        // No saved user, show the login screen normally
-        switchView('authContainer');
+        if (storedHandle && (await storedHandle.queryPermission({ mode: 'readwrite' })) === 'granted') {
+            window.Workspace.dirHandle = storedHandle;
+            document.getElementById('navStatus').innerHTML = `🟢 ${storedHandle.name}`;
+            
+            // Wait for the dropdown to build first
+            await populateUserDropdown();
+            
+            // --- NEW: Check for saved user session ---
+            const savedUser = localStorage.getItem('activeUser');
+            
+            if (savedUser) {
+                console.log(`Welcome back, ${savedUser}!`);
+                // Skip the login screen and go straight to the workspace
+                switchView('processingWorkspace'); 
+            } else {
+                // No saved user found, so show the login screen
+                switchView('authContainer');
+            }
+        }
+    } catch (e) {
+        console.warn("Could not load stored directory.", e);
     }
 });
 
@@ -188,20 +198,6 @@ async function setupDirectory(handle) {
     const navStatus = document.getElementById('navStatus');
     if (navStatus) navStatus.textContent = `✅ Connected: ${dirHandle.name}`;
 }
-
-window.addEventListener('DOMContentLoaded', async () => {
-    try {
-        const storedHandle = await getDB('masterARFolder');
-        if (storedHandle && (await storedHandle.queryPermission({ mode: 'readwrite' })) === 'granted') {
-            window.Workspace.dirHandle = storedHandle;
-            document.getElementById('navStatus').innerHTML = `🟢 ${storedHandle.name}`;
-            await populateUserDropdown();
-            switchView('authContainer');
-        }
-    } catch (e) {
-        console.warn("Could not load stored directory.", e);
-    }
-});
 
 document.getElementById('connectFolderBtn').addEventListener('click', async () => {
     try {
