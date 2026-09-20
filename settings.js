@@ -2,7 +2,22 @@
 window.Workspace = {
     dirHandle: null,
     currentUser: null,
-    settings: {}
+    settings: {},
+    
+    // Your main data hub for all AR tools
+    appData: {
+        waiverInvoices: [],
+        unpaidInvoices: [],
+        invInProcessing: [],
+        rejectionNotes: [],
+        jobInfo: [],
+        contractInfo: [],
+        templateList: [],
+        empEmails: [],
+        customerInfo: [],
+        vendorInfo: [],
+        waivers: []
+    }
 };
 
 // --- Native Database Setup (IndexedDB for remembering the folder) ---
