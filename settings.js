@@ -10,6 +10,7 @@ window.Workspace = {
         unpaidInvoices: [],
         invInProcessing: [],
         rejectionNotes: [],
+        openAR: [],
         jobInfo: [],
         contractInfo: [],
         templateList: [],
@@ -18,6 +19,13 @@ window.Workspace = {
         vendorInfo: [],
         waivers: []
     }
+};
+
+window.WORKSPACE_FILE_PATHS = {
+    openAR: "Data/DailyUpdateData/Open AR.xlsx",
+    unpaidInvoices: "Data/DailyUpdateData/UnpaidInvoices.xlsx",
+    empEmails: "Directory/Employee_Directory.xlsx"
+    // Add all your file paths here!
 };
 
 // --- Native Database Setup (IndexedDB for remembering the folder) ---
