@@ -14,18 +14,35 @@ window.Workspace = {
         jobInfo: [],
         contractInfo: [],
         templateList: [],
-        empEmails: [],
+        empInfo: [],
         customerInfo: [],
         vendorInfo: [],
-        waivers: []
+        waivers: [],
+        collectionNotes: [],
+        nonPaymentList: [],
+        WIP: [],
+        noticeTracker: [],
+        billingTracker: []
     }
 };
 
 window.WORKSPACE_FILE_PATHS = {
-    openAR: "Data/DailyUpdateData/Open AR.xlsx",
-    unpaidInvoices: "Data/DailyUpdateData/UnpaidInvoices.xlsx",
-    empEmails: "Directory/Employee_Directory.xlsx"
-    // Add all your file paths here!
+    openAR: "Data/DailyUpdateData/Open AR [TODAY].xlsx",
+    unpaidInvoices: "Data/DailyUpdateData/Unpaid Invoices [TODAY].xlsx",
+    invInProcessing: "Data/DailyUpdateData/In Onbase [TODAY].xlsx",
+    rejectionNotes: "Data/DailyUpdateData/Rejection Notes [TODAY].xlsx",
+    jobInfo: "Data/DailyUpdateData/Job Address [TODAY].xlsx",
+    empInfo: "Data/MainData/Employee Info.xlsx",
+    customerInfo: "Data/MainData/GC Info.xlsx",
+    templateList: "Data/MainData/Templates.xlsx",
+    vendorInfo: "Data/MainData/Vendor Info.xlsx",
+    contractInfo: "Data/MainData/Contract Info.xlsx",
+    waivers: "Data/MainData/Master Waiver.xlsx",
+    collectionNotes: "Data/MainData/Collection Notes.xlsx",
+    nonPaymentList: "Data/MainData/TX NPN Tracking.xlsx",
+    WIP: "Data/MainData/WIP.xlsx",
+    noticeTracker: "Data/MainData/Prelim Tracker.xlsx",
+    billingTracker: "Data/MainData/Billing Checklist.xlsx",
 };
 
 // --- Native Database Setup (IndexedDB for remembering the folder) ---
