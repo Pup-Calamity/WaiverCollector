@@ -111,7 +111,8 @@ function renderWaiverTable() {
         // Check Month
         let matchesMonth = true;
         if (monthFilter !== "ALL") {
-            matchesMonth = (waiver["Waiver Month"] === monthFilter);
+            const rowMonthYear = `${waiver["Month"]}/${waiver["Year"]}`;
+            matchesMonth = (rowMonthYear === monthFilter);
         }
 
         // Only show the row if it passes ALL filters
