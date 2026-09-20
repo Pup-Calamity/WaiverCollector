@@ -29,33 +29,99 @@ function generateWaiverKey(jobId, vendorId, month, year) {
     return `${baseKey}${nextNumber}`;
 }
 
-// --- Navigation ---
-document.getElementById('launchWaiverToolBtn').addEventListener('click', () => {
-    switchView('waiverToolView');
-    renderWaiverTable(); // We will build this next!
+// waiverTool.js
+
+// --- Navigation & Setup ---
+window.addEventListener('DOMContentLoaded', () => {
+    const launchBtn = document.getElementById('launchWaiverToolBtn');
+    if (launchBtn) {
+        launchBtn.addEventListener('click', () => {
+            switchView('waiverToolView');
+            populateMonthDropdown(); // Build the dropdown options
+            renderWaiverTable();     // Draw the table
+        });
+    }
+
+    const backBtn = document.getElementById('backToHubBtn');
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            switchView('processingWorkspace');
+        });
+    }
+
+    // --- NEW: Attach live event listeners to filters ---
+    document.getElementById('waiverSearch').addEventListener('input', renderWaiverTable);
+    document.getElementById('waiverStatusFilter').addEventListener('change', renderWaiverTable);
+    document.getElementById('waiverMonthFilter').addEventListener('change', renderWaiverTable);
 });
 
-document.getElementById('backToHubBtn').addEventListener('click', () => {
-    switchView('processingWorkspace');
-});
-// Inside waiverTool.js
+// --- Dynamic Filter Population ---
+function populateMonthDropdown() {
+    const monthDropdown = document.getElementById('waiverMonthFilter');
+    monthDropdown.innerHTML = '<option value="ALL">All Months</option>'; // Reset it
 
+    const waivers = window.Workspace.appData.waivers;
+    if (!waivers) return;
+
+    // Create a list of unique months from your data
+    const uniqueMonths = [...new Set(waivers.map(w => w["Waiver Month"]).filter(Boolean))];
+
+    uniqueMonths.forEach(month => {
+        const option = document.createElement('option');
+        option.value = month;
+        option.textContent = month;
+        monthDropdown.appendChild(option);
+    });
+}
+
+// --- Data Rendering & Filtering ---
 function renderWaiverTable() {
     const tbody = document.getElementById('waiverTableBody');
-    tbody.innerHTML = ''; // Clear out the "No data loaded" message
+    tbody.innerHTML = ''; 
     
-    // Grab the data from the global hub
     const waivers = window.Workspace.appData.waivers;
-    
     if (!waivers || waivers.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="padding: 20px; text-align: center;">No waivers found in the database.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="padding: 20px; text-align: center;">No waivers found.</td></tr>`;
         return;
     }
 
-    // Loop through the data and build the HTML rows
-    waivers.forEach(waiver => {
-        // Determine status based on whether "Received Date" has a value
-        const isReceived = waiver["Received Date"] && waiver["Received Date"].trim() !== "";
+    // 1. Get the current value of all three filters
+    const searchTerm = document.getElementById('waiverSearch').value.toLowerCase();
+    const statusFilter = document.getElementById('waiverStatusFilter').value;
+    const monthFilter = document.getElementById('waiverMonthFilter').value;
+
+    // 2. Filter the data array
+    const filteredWaivers = waivers.filter(waiver => {
+        
+        // Check Search (Job ID or Vendor ID)
+        const job = (waiver["Job ID"] || '').toString().toLowerCase();
+        const vendor = (waiver["Vendor ID"] || '').toString().toLowerCase();
+        const matchesSearch = job.includes(searchTerm) || vendor.includes(searchTerm);
+
+        // Check Status (Relies on Received Date being filled)
+        const isReceived = waiver["Received Date"] && waiver["Received Date"].toString().trim() !== "";
+        let matchesStatus = true;
+        if (statusFilter === "PENDING") matchesStatus = !isReceived;
+        if (statusFilter === "RECEIVED") matchesStatus = isReceived;
+
+        // Check Month
+        let matchesMonth = true;
+        if (monthFilter !== "ALL") {
+            matchesMonth = (waiver["Waiver Month"] === monthFilter);
+        }
+
+        // Only show the row if it passes ALL filters
+        return matchesSearch && matchesStatus && matchesMonth;
+    });
+
+    if (filteredWaivers.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="padding: 20px; text-align: center;">No waivers match your filters.</td></tr>`;
+        return;
+    }
+
+    // 3. Render the filtered rows
+    filteredWaivers.forEach(waiver => {
+        const isReceived = waiver["Received Date"] && waiver["Received Date"].toString().trim() !== "";
         const statusBadge = isReceived 
             ? `<span style="background: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 6px; font-size: 0.85em; font-weight: bold;">Received</span>`
             : `<span style="background: #fef08a; color: #854d0e; padding: 4px 8px; border-radius: 6px; font-size: 0.85em; font-weight: bold;">Pending</span>`;
@@ -81,8 +147,6 @@ function renderWaiverTable() {
     });
 }
 
-// Dummy function for the Review button (we will expand this later)
 function openWaiverDetails(waiverId) {
     console.log(`Opening details for Waiver: ${waiverId}`);
-    // Here we can pop up a modal that joins the Vendor Name and Job Name for a full review!
 }
