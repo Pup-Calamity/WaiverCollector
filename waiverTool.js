@@ -1,5 +1,34 @@
 // waiverTool.js
 
+// --- Waiver Key Generator ---
+function generateWaiverKey(jobId, vendorId, month, year) {
+    // 1. Clean the inputs (removes accidental spaces and ensures they are strings)
+    const jId = String(jobId).trim();
+    const vId = String(vendorId).trim();
+    const m = String(month).trim();
+    const y = String(year).trim();
+    
+    // 2. Build the base string: e.g., "J-101V-500Sep2026"
+    const baseKey = `${jId}${vId}${m}${y}`;
+    
+    // 3. Look at your currently loaded waivers to find matches
+    const existingWaivers = window.Workspace.appData.waivers || [];
+    
+    // 4. Count how many times this EXACT combination already exists
+    const matchingCount = existingWaivers.filter(w => {
+        return String(w["Job ID"]).trim() === jId &&
+               String(w["Vendor ID"]).trim() === vId &&
+               String(w["Month"]).trim() === m &&
+               String(w["Year"]).trim() === y;
+    }).length;
+    
+    // 5. The new suffix is the current count + 1 (Starts at 1, increments if duplicates exist)
+    const nextNumber = matchingCount + 1;
+    
+    // 6. Return the final composite key: e.g., "J-101V-500Sep20261"
+    return `${baseKey}${nextNumber}`;
+}
+
 // --- Navigation ---
 document.getElementById('launchWaiverToolBtn').addEventListener('click', () => {
     switchView('waiverToolView');
