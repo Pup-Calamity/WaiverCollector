@@ -72,7 +72,6 @@ window.addEventListener('DOMContentLoaded', async () => {
             if (savedUser && savedPin) {
                 console.log(`Silently logging in ${savedUser}...`);
                 
-                // Re-run the critical startup functions
                 window.Workspace.settings = await loadUserProfile(savedUser, savedPin);
                 window.Workspace.currentUser = savedUser;
                 applyTheme(window.Workspace.settings.theme || 'light');
@@ -80,10 +79,9 @@ window.addEventListener('DOMContentLoaded', async () => {
                 
                 switchView('processingWorkspace');
                 
+                // --- SKIP DATA LOAD ON REFRESH ---
                 const subtitle = document.querySelector('.hub-section .subtitle');
-                subtitle.textContent = "Loading spreadsheet data... ⏳";
-                await loadDataset();
-                subtitle.textContent = "All data loaded. Select a tool to begin.";
+                subtitle.textContent = "Ready. (Data will auto-sync when a tool is opened).";
             } else {
                 switchView('authContainer');
             }
@@ -243,16 +241,15 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
         window.Workspace.settings = await loadUserProfile(user, pin);
         window.Workspace.currentUser = user;
         
-        // --- NEW: Save the session so it survives a refresh ---
+        // Save session
         localStorage.setItem('activeUser', user);
         localStorage.setItem('activePin', pin); 
-        // ------------------------------------------------------
         
         applyTheme(window.Workspace.settings.theme || 'light');
         document.getElementById('welcomeText').textContent = `Welcome, ${user}!`;
         switchView('processingWorkspace');
 
-        // --- Trigger Data Load ---
+        // --- LOAD DATA ONCE AT LOGIN ---
         const subtitle = document.querySelector('.hub-section .subtitle');
         subtitle.textContent = "Loading spreadsheet data... ⏳";
         
@@ -302,5 +299,25 @@ document.getElementById('createProfileBtn').addEventListener('click', async () =
     } catch (error) {
         alert("Failed to create profile: " + error.message);
     }
+});
+
+document.getElementById('manualSyncBtn').addEventListener('click', async () => {
+    const syncBtn = document.getElementById('manualSyncBtn');
+    const statusText = document.getElementById('syncStatusText');
+    
+    syncBtn.disabled = true;
+    syncBtn.textContent = "Syncing... ⏳";
+    statusText.textContent = "Status: Reading Excel files...";
+
+    try {
+        await loadDataset(); // Your master data loader
+        statusText.textContent = `Status: Last synced at ${new Date().toLocaleTimeString()}`;
+    } catch (error) {
+        statusText.textContent = "Status: Sync failed. Check console.";
+        console.error(error);
+    }
+
+    syncBtn.disabled = false;
+    syncBtn.textContent = "📥 Sync Data from Excel";
 });
 
