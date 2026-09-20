@@ -130,7 +130,7 @@ ${formattedBase64}
 }
 
 // --- Report: AP03 Approval Reminders ---
-// --- Report: Approval Reminders ---
+// --- Report: Approval Reminders (Grouped by Job) ---
 async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
     const waivers = window.Workspace.appData.waivers;
     const invInProcessing = window.Workspace.appData.invInProcessing;
@@ -144,23 +144,14 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
 
     const emailFolderHandle = await window.Workspace.dirHandle.getDirectoryHandle("Generated_Emails", { create: true });
     
-    // 1. Date Matching: Force both to integers to safely match "9" vs "09"
-    const formattedTargetMonth = String(targetMonth).padStart(2, '0');
-    const formattedTargetYear = String(targetYear).trim();
-
-    // This safely handles "08" from Excel and "8" from your HTML as identical.
+    // 1. Date Matching: Force both into pure mathematical integers.
     const targetWaivers = waivers.filter(w => {
-        // Use parseInt on both the Excel data and the HTML input
         const rowMonth = parseInt(w["Month"]);
         const rowYear = parseInt(w["Year"]);
-        
         const filterMonth = parseInt(targetMonth);
         const filterYear = parseInt(targetYear);
         
-        // Ensure none of them parsed as NaN (Not a Number) before comparing
-        if (isNaN(rowMonth) || isNaN(rowYear) || isNaN(filterMonth) || isNaN(filterYear)) {
-            return false; 
-        }
+        if (isNaN(rowMonth) || isNaN(rowYear) || isNaN(filterMonth) || isNaN(filterYear)) return false; 
 
         return (rowMonth === filterMonth) && (rowYear === filterYear);
     });
@@ -168,37 +159,45 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
     logMsg(`🔍 Found ${targetWaivers.length} waivers for ${targetMonth}/${targetYear}. Scanning for stuck invoices...`);
     if (targetWaivers.length === 0) return;
 
+    // 2. Group by Job: Extract a list of unique Job IDs from those waivers
+    const uniqueJobs = [...new Set(targetWaivers.map(w => String(w["Job ID"] || '').trim().toLowerCase()))].filter(Boolean);
     let emailCount = 0;
 
-    for (const waiver of targetWaivers) {
-        const jobId = String(waiver["Job ID"] || '').trim();
-        const vendorId = String(waiver["Vendor ID"] || '').trim();
+    for (const jobId of uniqueJobs) {
+        
+        // Find all waivers for this specific Job this month to get the list of Vendors we care about
+        const jobWaivers = targetWaivers.filter(w => String(w["Job ID"] || '').trim().toLowerCase() === jobId);
+        const vendorIds = jobWaivers.map(w => String(w["Vendor ID"] || '').trim().toLowerCase());
+        
+        // We want the original capitalized Job ID for the email text
+        const displayJobId = String(jobWaivers[0]["Job ID"] || '').trim();
 
-        // 2. Find invoices strictly in an "Approval" queue
+        // 3. Find ALL invoices for this Job that belong to ANY of those Vendors AND are in "Approval"
         const matchingInvoices = invInProcessing.filter(inv => {
             const invJob = String(inv["jobid"] || '').trim().toLowerCase();
             const invVendor = String(inv["vendorid"] || '').trim().toLowerCase();
             const invQueue = String(inv["Queue"] || '').trim().toLowerCase();
             
-            return (invJob === jobId.toLowerCase() && 
-                    invVendor === vendorId.toLowerCase() && 
-                    invQueue.includes("approval")); // Catching all "Approval" variations
+            return (invJob === jobId && 
+                    vendorIds.includes(invVendor) && 
+                    invQueue.includes("approval")); 
         });
 
+        // If we found stuck invoices for this job, build ONE aggregated email
         if (matchingInvoices.length > 0) {
-            // 3. Look up Job and Contact Info
-            const jobData = jobInfo.find(j => String(j["Job ID"]).trim() === jobId) || {};
+            
+            // 4. Look up Job and Contact Info
+            const jobData = jobInfo.find(j => String(j["Job ID"]).trim().toLowerCase() === jobId) || {};
             const pcName = jobData["Project Manager"] || 'Unknown PC';
             const omName = jobData["Project Controller"] || 'Unknown OM';
             const jobName = jobData["Job Name"] || '';
 
-            // Check memory, prompt if missing, save to Excel
             const pcEmail = await getEmployeeEmail(pcName, logMsg);
             const omEmail = await getEmployeeEmail(omName, logMsg);
             const ccEmails = [pcEmail, omEmail].filter(Boolean).join("; ");
 
-            // 4. Calculate AR Open Amount & Aging
-            const jobAR = openAR.filter(ar => String(ar["Job Number"]).trim() === jobId);
+            // 5. Calculate AR Open Amount & Aging for the whole Job
+            const jobAR = openAR.filter(ar => String(ar["Job Number"]).trim().toLowerCase() === jobId);
             
             let amountOpen = 0;
             let invAge = 0;
@@ -211,24 +210,24 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
 
             const formattedAmountOpen = amountOpen.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 
-            // 5. Build the HTML Table
+            // 6. Build the HTML Table (Tightened padding to 4px)
             let invoiceRowsHtml = "";
             matchingInvoices.forEach(inv => {
                 const formattedAmount = Number(inv["Amount"]).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
                 invoiceRowsHtml += `
                     <tr>
-                        <td style="padding: 8px; border: 1px solid #ccc;">${pcName} / ${omName}</td>
-                        <td style="padding: 8px; border: 1px solid #ccc;">${jobId}</td>
-                        <td style="padding: 8px; border: 1px solid #ccc;">${inv["invoicenumb"] || ''}</td>
-                        <td style="padding: 8px; border: 1px solid #ccc;">${inv["vendorid"] || ''}</td>
-                        <td style="padding: 8px; border: 1px solid #ccc;">${inv["vendorname"] || ''}</td>
-                        <td style="padding: 8px; border: 1px solid #ccc;">${inv["invoicedate (Day-Month-Year)"] || ''}</td>
-                        <td style="padding: 8px; border: 1px solid #ccc;">${formattedAmount}</td>
-                        <td style="padding: 8px; border: 1px solid #ccc;">${inv["Aging"] || '0'}</td>
+                        <td style="padding: 4px; border: 1px solid #ccc;">${pcName} / ${omName}</td>
+                        <td style="padding: 4px; border: 1px solid #ccc;">${displayJobId}</td>
+                        <td style="padding: 4px; border: 1px solid #ccc;">${inv["invoicenumb"] || ''}</td>
+                        <td style="padding: 4px; border: 1px solid #ccc;">${inv["vendorid"] || ''}</td>
+                        <td style="padding: 4px; border: 1px solid #ccc;">${inv["vendorname"] || ''}</td>
+                        <td style="padding: 4px; border: 1px solid #ccc;">${inv["invoicedate (Day-Month-Year)"] || ''}</td>
+                        <td style="padding: 4px; border: 1px solid #ccc;">${formattedAmount}</td>
+                        <td style="padding: 4px; border: 1px solid #ccc;">${inv["Aging"] || '0'}</td>
                     </tr>`;
             });
 
-            // 6. Construct the Email Body
+            // 7. Construct the Email Body
             const htmlBody = `
                 <div style="font-family: Calibri, sans-serif; font-size: 11pt; color: #333;">
                     <p><span style="background-color: #dcfce7; padding: 3px;"><strong>NOTE:</strong> This notification DOES NOT indicate whether your project has been funded, or that the vendor is refusing to sign a waiver. This is to be used as a tool to draw awareness to potential issues that may hold up our payment.</span></p>
@@ -246,14 +245,14 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
                     <table style="border-collapse: collapse; width: 100%; margin: 15px 0; font-size: 10pt;">
                         <thead>
                             <tr style="background-color: #f3f4f6; text-align: left;">
-                                <th style="padding: 8px; border: 1px solid #ccc;">PC/OM</th>
-                                <th style="padding: 8px; border: 1px solid #ccc;">Job ID</th>
-                                <th style="padding: 8px; border: 1px solid #ccc;">Invoice Number</th>
-                                <th style="padding: 8px; border: 1px solid #ccc;">Vendor ID</th>
-                                <th style="padding: 8px; border: 1px solid #ccc;">Vendor Name</th>
-                                <th style="padding: 8px; border: 1px solid #ccc;">Invoice Date</th>
-                                <th style="padding: 8px; border: 1px solid #ccc;">Amount</th>
-                                <th style="padding: 8px; border: 1px solid #ccc;">Days in Queue</th>
+                                <th style="padding: 4px; border: 1px solid #ccc;">PC/OM</th>
+                                <th style="padding: 4px; border: 1px solid #ccc;">Job ID</th>
+                                <th style="padding: 4px; border: 1px solid #ccc;">Invoice Number</th>
+                                <th style="padding: 4px; border: 1px solid #ccc;">Vendor ID</th>
+                                <th style="padding: 4px; border: 1px solid #ccc;">Vendor Name</th>
+                                <th style="padding: 4px; border: 1px solid #ccc;">Invoice Date</th>
+                                <th style="padding: 4px; border: 1px solid #ccc;">Amount</th>
+                                <th style="padding: 4px; border: 1px solid #ccc;">Days in Queue</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -266,9 +265,10 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
                 </div>
             `;
 
-            const fileName = `ApprovalReminder_${jobId}_${vendorId}`;
+            // Filename is now grouped just by the Job ID
+            const fileName = `ApprovalReminder_${displayJobId}`; 
             const toEmail = ccEmails || "missing-contact@company.com"; 
-            const subject = `NOTIFICATION: Potential Payment Delay for ${jobId} - ${jobName}`;
+            const subject = `NOTIFICATION: Potential Payment Delay for ${displayJobId} - ${jobName}`;
 
             const success = await generateEmailFile(emailFolderHandle, fileName, toEmail, "", subject, htmlBody);
             
@@ -281,7 +281,6 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
 
     logMsg(`✅ Batch Complete! Generated ${emailCount} Approval Reminders.`);
 }
-
 
 // --- Global Email Lookup Utility ---
 async function getEmployeeEmail(empName, logMsg = console.log) {
