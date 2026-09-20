@@ -11,7 +11,7 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
         logMsg("❌ Missing required data! Please hit 'Sync Data'.", true);
         return;
     }
-
+ 
     const emailFolderHandle = await window.Workspace.dirHandle.getDirectoryHandle("Generated_Emails", { create: true });
     
     const targetWaivers = waivers.filter(w => {
