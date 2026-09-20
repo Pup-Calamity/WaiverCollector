@@ -212,21 +212,31 @@
 <body>
 
     <!-- Top Navigation -->
-    <nav>
-        <div id="navStatus" class="status-pill">🔴 Disconnected</div>
-        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
-            <button id="manualSyncBtn" class="primary-btn" style="width: auto; margin: 0; background: #3b82f6;">
-                📥 Sync Data from Excel
+    <nav style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; border-bottom: 1px solid var(--border-color); background: var(--bg-color);">
+    
+        <!-- Left Zone: Connection Status -->
+        <div style="display: flex; align-items: center; flex: 1;">
+            <div id="navStatus" class="status-pill" style="margin: 0;">🔴 Disconnected</div>
+        </div>
+    
+        <!-- Center Zone: Data Sync -->
+        <div style="display: flex; align-items: center; justify-content: center; gap: 12px; flex: 1;">
+            <button id="manualSyncBtn" class="primary-btn" style="width: auto; margin: 0; padding: 6px 16px; background: #3b82f6; font-size: 0.9em;">
+                📥 Sync Data
             </button>
-            <span id="syncStatusText" style="font-size: 0.9em; color: var(--text-muted);">
-                Status: Waiting for sync...
+            <span id="syncStatusText" style="font-size: 0.85em; color: var(--text-muted); white-space: nowrap;">
+                Waiting for sync...
             </span>
         </div>
-        <button id="logoutBtn" class="primary-btn" style="background: transparent; color: var(--text-muted); border: 1px solid var(--border-color);">
-            Log Out
-        </button>
-        <button id="themeToggle" class="icon-btn" title="Toggle Dark Mode">🌙</button>
-        
+    
+        <!-- Right Zone: User Actions -->
+        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex: 1;">
+            <button id="themeToggle" class="icon-btn" title="Toggle Dark Mode" style="margin: 0; padding: 6px;">🌙</button>
+            <button id="logoutBtn" style="width: auto; margin: 0; padding: 6px 12px; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em; cursor: pointer; transition: all 0.2s;">
+                Log Out
+            </button>
+        </div>
+    
     </nav>
 
     <!-- VIEW 1: Connect Folder -->
