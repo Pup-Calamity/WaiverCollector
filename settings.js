@@ -47,7 +47,6 @@ window.WORKSPACE_FILE_PATHS = {
     jobNotes: "Data/MainData/Job Notes.xlsx",
     waiverInvoices: "Data/DailyUpdateData/Waiver Invoices.xlsx"
 };
-
 // --- Native Database Setup (IndexedDB for remembering the folder) ---
 const dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open('WaiverIO_DB', 1);
