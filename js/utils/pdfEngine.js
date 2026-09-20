@@ -1,5 +1,8 @@
-// pdfEngine.js
+// js/utils/pdfEngine.js
+
 export async function stampWaiverWithConfig(pdfArrayBuffer, vendorData, configJson) {
+    if (!window.PDFLib) throw new Error("PDF-lib is not loaded. Check index.html script tags.");
+    
     const pdfDoc = await window.PDFLib.PDFDocument.load(pdfArrayBuffer);
     const pages = pdfDoc.getPages();
     const firstPage = pages[0]; 
@@ -17,19 +20,24 @@ export async function stampWaiverWithConfig(pdfArrayBuffer, vendorData, configJs
         });
     }
 
-    // 2. Stamp the new text on top
+    // 2. Stamp the new dynamic text on top
     if (configJson.fields) {
         for (const [variableName, coords] of Object.entries(configJson.fields)) {
-            if (vendorData[variableName]) {
-                firstPage.drawText(String(vendorData[variableName]), {
+            
+            // Only stamp if the data actually exists in our dictionary
+            const textToPrint = vendorData[variableName] !== undefined ? String(vendorData[variableName]) : "";
+            
+            if (textToPrint.trim() !== "") {
+                firstPage.drawText(textToPrint, {
                     x: coords.x,
                     y: coords.y,
                     size: coords.size || 12,
-                    color: window.PDFLib.rgb(0, 0, 0) 
+                    color: window.PDFLib.rgb(0, 0, 0) // Pure black
                 });
             }
         }
     }
 
+    // Return the raw byte array of the new PDF
     return await pdfDoc.save();
 }
