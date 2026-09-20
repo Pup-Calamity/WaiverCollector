@@ -214,10 +214,18 @@
     <!-- Top Navigation -->
     <nav>
         <div id="navStatus" class="status-pill">🔴 Disconnected</div>
-        <button id="themeToggle" class="icon-btn" title="Toggle Dark Mode">🌙</button>
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+            <button id="manualSyncBtn" class="primary-btn" style="width: auto; margin: 0; background: #3b82f6;">
+                📥 Sync Data from Excel
+            </button>
+            <span id="syncStatusText" style="font-size: 0.9em; color: var(--text-muted);">
+                Status: Waiting for sync...
+            </span>
+        </div>
         <button id="logoutBtn" class="primary-btn" style="background: transparent; color: var(--text-muted); border: 1px solid var(--border-color);">
             Log Out
         </button>
+        <button id="themeToggle" class="icon-btn" title="Toggle Dark Mode">🌙</button>
         
     </nav>
 
