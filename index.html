@@ -282,7 +282,7 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="settings.js"></script>
     <script>
         // --- Dark/Light Mode Logic ---
         const themeToggle = document.getElementById('themeToggle');
@@ -305,7 +305,7 @@
             }
             
             // Optional: If a user is logged in, you can also save this to their personal config.json!
-            // if (currentUser) { appSettings.theme = localStorage.getItem('theme'); saveUserProfile(...); }
+            if (currentUser) { appSettings.theme = localStorage.getItem('theme'); saveUserProfile(...); }
         });
     </script>
 </body>
