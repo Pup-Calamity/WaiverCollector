@@ -253,3 +253,98 @@ function renderWaiverTable() {
 function openWaiverDetails(waiverId) {
     console.log(`Opening details for Waiver: ${waiverId}`);
 }
+
+// --- Pre-Flight Validator ---
+async function validateWaiverRun(targetMonth, vendorList, jobId, startDay, endingDay, isFinal, skipZero) {
+    const appData = window.Workspace.appData;
+    let errorLog = [];
+    let skippedCount = 0;
+    let validVendors = [];
+
+    // Loop through each vendor in the list
+    for (const vendorId of vendorList) {
+        const vendor = String(vendorId).trim();
+        const job = String(jobId).trim();
+        const searchKey = `${job}${vendor}`.toLowerCase();
+
+        // 1. Check Amount (Placeholder: See Question 1 below)
+        const vendorAmount = await calculateVendorAmount(job, vendor, startDay, endingDay, isFinal);
+        
+        if (vendorAmount <= 0) {
+            if (skipZero) {
+                skippedCount++;
+                continue; // Skip the rest of the checks and move to the next vendor
+            }
+        }
+
+        // 2. Check Email Setup 
+        // VBA used: ThisWorkbook.Worksheets("Email Information")
+        // We will look in our loaded contractInfo (or wherever this lives now)
+        const hasEmailSetup = appData.contractInfo.some(row => {
+            const rowJob = String(row["Job ID"] || '').trim().toLowerCase();
+            const rowVendor = String(row["Vendor ID"] || '').trim().toLowerCase();
+            return (rowJob + rowVendor) === searchKey;
+        });
+
+        if (!hasEmailSetup) {
+            errorLog.push(`- ${vendor}: Missing Email Information setup.`);
+        }
+
+        // 3. Check Template Setup
+        // VBA used: ThisWorkbook.Worksheets(tabMonth) to find the template string
+        const templateString = getTemplateStringFromMonthData(job, vendor, targetMonth);
+        
+        if (!templateString) {
+            errorLog.push(`- ${vendor}: Missing Template assignment for ${targetMonth}.`);
+        } else {
+            // Parse "PartialTemplate;FinalTemplate" logic
+            let targetTemplateName = "";
+            if (isFinal) {
+                // Grab everything AFTER the semicolon
+                const splitIndex = templateString.indexOf(";");
+                if (splitIndex === -1) {
+                    errorLog.push(`- ${vendor}: No Final template specified (missing ';' in setup).`);
+                    continue;
+                }
+                targetTemplateName = templateString.substring(splitIndex + 1).trim();
+            } else {
+                // Grab everything BEFORE the semicolon
+                const splitIndex = templateString.indexOf(";");
+                targetTemplateName = splitIndex === -1 ? templateString.trim() : templateString.substring(0, splitIndex).trim();
+            }
+
+            // Verify the template actually exists in the Template List
+            const templateExists = appData.templateList.some(t => 
+                String(t["Template Name"] || '').trim().toLowerCase() === targetTemplateName.toLowerCase()
+            );
+
+            if (!templateExists) {
+                errorLog.push(`- ${vendor}: Template '${targetTemplateName}' not found in Master Template List.`);
+            } else {
+                // If it passed everything, add it to our approved list
+                validVendors.push({ vendorId: vendor, templateName: targetTemplateName, amount: vendorAmount });
+            }
+        }
+    }
+
+    // 4. Return the Report Card
+    return {
+        passed: errorLog.length === 0,
+        errors: errorLog,
+        skipped: skippedCount,
+        validVendors: validVendors,
+        totalAttempted: vendorList.length
+    };
+}
+
+// Stub function for calculating the amount
+async function calculateVendorAmount(job, vendor, startDay, endingDay, isFinal) {
+    // We need to build this logic! For now, assuming everything has a balance of $100.
+    return 100.00; 
+}
+
+// Stub function for finding the template
+function getTemplateStringFromMonthData(job, vendor, targetMonth) {
+    // We need to map this!
+    return "Standard Partial;Standard Final"; 
+}
