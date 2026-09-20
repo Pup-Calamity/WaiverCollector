@@ -80,3 +80,48 @@ function calculateWaiverDates(targetMonth, targetYear, dueDayOffset, throughDay)
         throughPeriod: throughPeriodStr
     };
 }
+
+// --- Upgraded Multipart EML Generator ---
+async function generateEmailFile(saveFolderHandle, fileName, to, cc, subject, htmlBody, attachmentHandles = []) {
+    try {
+        const boundary = "----=_NextPart_EMAIL_BOUNDARY_" + Date.now();
+        
+        let emlContent = 
+`To: ${to}
+CC: ${cc}
+Subject: ${subject}
+X-Unsent: 1
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="${boundary}"
+
+--${boundary}
+Content-Type: text/html; charset="utf-8"
+
+${htmlBody}
+`;
+
+        if (attachmentHandles && attachmentHandles.length > 0) {
+            for (const handle of attachmentHandles) {
+                const file = await handle.getFile();
+                const base64Data = await fileToBase64(file);
+                const formattedBase64 = base64Data.match(/.{1,76}/g).join('\r\n');
+
+                emlContent += `\n--${boundary}\nContent-Type: application/octet-stream; name="${file.name}"\nContent-Transfer-Encoding: base64\nContent-Disposition: attachment; filename="${file.name}"\n\n${formattedBase64}\n`;
+            }
+        }
+
+        emlContent += `\n--${boundary}--\n`;
+
+        const safeFileName = fileName.replace(/[<>:"/\\|?*]+/g, '_') + ".eml";
+        const fileHandle = await saveFolderHandle.getFileHandle(safeFileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        
+        await writable.write(emlContent);
+        await writable.close();
+        
+        return true;
+    } catch (error) {
+        console.error(`❌ Failed to save email ${fileName}:`, error);
+        return false;
+    }
+}
