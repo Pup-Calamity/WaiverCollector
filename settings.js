@@ -265,6 +265,15 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     }
 });
 
+document.getElementById('logoutBtn').addEventListener('click', () => {
+    // Clear the saved memory
+    localStorage.removeItem('activeUser');
+    
+    // Kick them back to the login screen
+    document.getElementById('userPin').value = ''; // Clear the password field
+    switchView('authContainer');
+});
+
 // --- Create Profile Action ---
 document.getElementById('createProfileBtn').addEventListener('click', async () => {
     const newName = document.getElementById('newUsername').value.trim();
