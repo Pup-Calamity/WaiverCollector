@@ -257,7 +257,7 @@
         
         <div class="tool-grid">
             <!-- Tool 1 -->
-            <div class="tool-card" onclick="alert('Launching Waiver Processor...')">
+            <div class="tool-card" id="launchWaiverToolBtn" onclick="alert('Launching Waiver Processor...')">
                 <div class="tool-icon">📝</div>
                 <h3>Waiver Processor</h3>
                 <p>Process vendor lien waivers, check compliance, and update master records.</p>
@@ -279,6 +279,60 @@
                 <p>View high-level project metrics and current accounts receivable status.</p>
                 <div class="launch-link">Launch Tool →</div>
             </div>
+        </div>
+    </div>
+
+    <!-- VIEW 4: Waiver Processor Tool -->
+    <div id="waiverToolView" class="view-section hub-section" style="display: none;">
+        
+        <!-- Header & Navigation -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+                <h2>📝 Waiver Processor</h2>
+                <p class="subtitle" style="margin-bottom: 0;">Manage and track vendor lien waivers.</p>
+            </div>
+            <button id="backToHubBtn" class="icon-btn" style="width: auto; padding: 10px 20px; border-radius: 8px;">
+                ← Back to Hub
+            </button>
+        </div>
+
+        <hr>
+
+        <!-- Control Bar: Search and Filters -->
+        <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+            <input type="text" id="waiverSearch" placeholder="Search Job ID or Vendor..." style="margin-bottom: 0; flex-grow: 1;">
+            
+            <select id="waiverStatusFilter" style="margin-bottom: 0; width: 200px;">
+                <option value="ALL">All Waivers</option>
+                <option value="PENDING">Pending (Not Received)</option>
+                <option value="RECEIVED">Received</option>
+            </select>
+            
+            <button id="refreshWaiversBtn" class="primary-btn" style="width: auto; margin: 0;">Refresh Data</button>
+        </div>
+
+        <!-- The Data Table -->
+        <div style="background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; box-shadow: var(--card-shadow);">
+            <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                <thead>
+                    <tr style="background: var(--bg-color); border-bottom: 2px solid var(--border-color);">
+                        <th style="padding: 15px; font-weight: 600; color: var(--text-muted);">Job ID</th>
+                        <th style="padding: 15px; font-weight: 600; color: var(--text-muted);">Vendor ID</th>
+                        <th style="padding: 15px; font-weight: 600; color: var(--text-muted);">Waiver Month</th>
+                        <th style="padding: 15px; font-weight: 600; color: var(--text-muted);">Sent Date</th>
+                        <th style="padding: 15px; font-weight: 600; color: var(--text-muted);">Status</th>
+                        <th style="padding: 15px; font-weight: 600; color: var(--text-muted);">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="waiverTableBody">
+                    <!-- JavaScript will inject the rows here -->
+                    <tr>
+                        <td colspan="6" style="padding: 30px; text-align: center; color: var(--text-muted);">
+                            No data loaded.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 
