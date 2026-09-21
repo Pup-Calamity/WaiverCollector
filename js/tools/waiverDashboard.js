@@ -5,10 +5,12 @@ const monthNames = ["", "January", "February", "March", "April", "May", "June", 
 window.addEventListener('DOMContentLoaded', () => {
     
     // UI Navigation Hooks
-    const launchBtn = document.getElementById('launchDashboardBtn'); // Assuming you add a button on your Hub
+    const launchBtn = document.getElementById('launchDashboardBtn'); 
     if (launchBtn) {
         launchBtn.addEventListener('click', () => {
-            if (!window.Workspace.appData.waivers) return alert("Please sync data first.");
+            if (!window.Workspace || !window.Workspace.appData.waivers) {
+                return alert("Please sync data first.");
+            }
             switchView('waiverDashboardView');
             populateYearFilter();
             renderWaiverTable();
@@ -19,24 +21,38 @@ window.addEventListener('DOMContentLoaded', () => {
     if (backBtn) backBtn.addEventListener('click', () => switchView('processingWorkspace'));
 
     // Filter Listeners (Trigger live updates)
-    document.getElementById('dashboardSearch').addEventListener('input', renderWaiverTable);
-    document.getElementById('dashboardMonth').addEventListener('change', renderWaiverTable);
-    document.getElementById('dashboardYear').addEventListener('change', renderWaiverTable);
+    const searchBox = document.getElementById('dashboardSearch');
+    const monthBox = document.getElementById('dashboardMonth');
+    const yearBox = document.getElementById('dashboardYear');
+
+    if (searchBox) searchBox.addEventListener('input', renderWaiverTable);
+    if (monthBox) monthBox.addEventListener('change', renderWaiverTable);
+    if (yearBox) yearBox.addEventListener('change', renderWaiverTable);
 
     // Modal Close
-    document.getElementById('closeNotesModalBtn').addEventListener('click', () => {
-        document.getElementById('readNotesModal').close();
-    });
+    const closeNotesBtn = document.getElementById('closeNotesModalBtn');
+    if (closeNotesBtn) {
+        closeNotesBtn.addEventListener('click', () => {
+            document.getElementById('readNotesModal').close();
+        });
+    }
 });
 
 // --- Dynamic Year Dropdown ---
-function populateYearFilter() {
+window.populateYearFilter = function() {
     const waivers = window.Workspace.appData.waivers || [];
     const yearSelect = document.getElementById('dashboardYear');
+    
+    if (!yearSelect) {
+        console.error("❌ Could not find 'dashboardYear' dropdown in HTML!");
+        return;
+    }
     
     // Extract unique years from the dataset, sort descending
     const uniqueYears = [...new Set(waivers.map(w => String(w["Year"]).trim()))].filter(y => y && y !== "undefined");
     uniqueYears.sort((a, b) => b - a);
+
+    console.log(`📅 Found ${uniqueYears.length} unique years for the dropdown:`, uniqueYears);
 
     // Keep the "All Years" option, then append dynamic years
     yearSelect.innerHTML = '<option value="">All Years</option>';
@@ -53,15 +69,26 @@ window.renderWaiverTable = function() {
     const waivers = window.Workspace.appData.waivers || [];
     const tbody = document.getElementById('waiverTableBody');
     
-    const searchVal = document.getElementById('dashboardSearch').value.toLowerCase();
-    const monthVal = document.getElementById('dashboardMonth').value;
-    const yearVal = document.getElementById('dashboardYear').value;
+    if (!tbody) {
+        console.error("❌ Could not find 'waiverTableBody' in HTML!");
+        return;
+    }
+
+    // Safely get values (fall back to empty strings if HTML elements are missing)
+    const searchInput = document.getElementById('dashboardSearch');
+    const monthInput = document.getElementById('dashboardMonth');
+    const yearInput = document.getElementById('dashboardYear');
+
+    const searchVal = searchInput ? searchInput.value.toLowerCase() : "";
+    const monthVal = monthInput ? monthInput.value : "";
+    const yearVal = yearInput ? yearInput.value : "";
 
     tbody.innerHTML = "";
 
-    // Sort waivers newest first based on Action Date (or fallback to ID)
-    const sortedWaivers = [...waivers].reverse(); 
+    console.log(`📊 Rendering table. Found ${waivers.length} total waivers in memory.`);
 
+    // Sort waivers newest first
+    const sortedWaivers = [...waivers].reverse(); 
     let matchCount = 0;
 
     for (const row of sortedWaivers) {
@@ -69,9 +96,18 @@ window.renderWaiverTable = function() {
         const vendorId = String(row["Vendor ID"] || "").trim();
         const customerId = String(row["Customer ID"] || "").trim();
         
-        // Smart Lookup: Fetch names from ContractInfo or default to "Unknown"
-        const jobName = WaiverMath.getEmailInfo(jobId, vendorId, "Job Name") || "Unknown Job";
-        const vendorName = WaiverMath.getEmailInfo(jobId, vendorId, "Vendor Name") || "Unknown Vendor";
+        let jobName = "Unknown Job";
+        let vendorName = "Unknown Vendor";
+
+        // Safely try to lookup the names
+        try {
+            if (typeof WaiverMath !== 'undefined') {
+                jobName = WaiverMath.getEmailInfo(jobId, vendorId, "Job Name") || "Unknown Job";
+                vendorName = WaiverMath.getEmailInfo(jobId, vendorId, "Vendor Name") || "Unknown Vendor";
+            }
+        } catch (error) {
+            console.warn("⚠️ WaiverMath lookup failed. Check if waiverMath.js is loaded.", error);
+        }
 
         // 1. FILTER: Month & Year
         if (monthVal && String(row["Month"]).trim() !== monthVal) continue;
@@ -123,11 +159,13 @@ window.renderWaiverTable = function() {
 
         // Bind the Notes Modal payload
         const notesBtn = tr.querySelector('.read-notes-btn');
-        const rawNotes = row["Notes"] || "No notes available.";
-        notesBtn.addEventListener('click', () => {
-            document.getElementById('notesModalContent').textContent = rawNotes;
-            document.getElementById('readNotesModal').showModal();
-        });
+        if (notesBtn) {
+            const rawNotes = row["Notes"] || "No notes available.";
+            notesBtn.addEventListener('click', () => {
+                document.getElementById('notesModalContent').textContent = rawNotes;
+                document.getElementById('readNotesModal').showModal();
+            });
+        }
 
         tbody.appendChild(tr);
     }
