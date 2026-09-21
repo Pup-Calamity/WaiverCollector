@@ -277,7 +277,19 @@ let dragOffsetY = 0;
 let isResizing = false;
 let initialWidth = 0;
 let initialHeight = 0;
-let initialY = 0; // Anchors the top edge during a resize
+let initialY = 0; 
+
+// --- NEW: CSS-to-Canvas Scaler ---
+// This ensures the mouse aligns perfectly even if the canvas is shrunk by CSS
+function getMousePos(canvas, evt) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;   
+    const scaleY = canvas.height / rect.height; 
+    return {
+        x: (evt.clientX - rect.left) * scaleX,
+        y: (evt.clientY - rect.top) * scaleY
+    };
+}
 
 function updateSelectionUI() {
     const nameLabel = document.getElementById('selectionName');
@@ -312,8 +324,8 @@ if (canvas) {
         e.preventDefault(); 
         if (!pdfViewport) return;
 
-        const rect = canvas.getBoundingClientRect();
-        const target = getHoveredItem(e.clientX - rect.left, e.clientY - rect.top, pdfViewport, templateMap);
+        const { x: mouseX, y: mouseY } = getMousePos(canvas, e);
+        const target = getHoveredItem(mouseX, mouseY, pdfViewport, templateMap);
         
         if (target && confirm(`Delete this item?`)) {
             if (target.type === 'variable') delete templateMap.fields[target.id];
@@ -326,17 +338,14 @@ if (canvas) {
 
     canvas.addEventListener('mousedown', (e) => {
         if (e.button !== 0 || !pdfViewport) return; 
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-
+        
+        const { x: mouseX, y: mouseY } = getMousePos(canvas, e);
         const currentToolNode = document.querySelector('input[name="toolMode"]:checked');
         const currentTool = currentToolNode ? currentToolNode.value : 'variable';
         
         dragField = getHoveredItem(mouseX, mouseY, pdfViewport, templateMap);
         
         if (dragField) { 
-            // Select the item and update UI
             selectedField = { type: dragField.type, id: dragField.id };
             updateSelectionUI();
 
@@ -364,7 +373,6 @@ if (canvas) {
             }
             redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap, selectedField);
         } else {
-            // Clicked empty space - deselect and start drawing new box
             selectedField = null;
             updateSelectionUI();
             redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap, selectedField);
@@ -379,9 +387,8 @@ if (canvas) {
 
     canvas.addEventListener('mousemove', (e) => {
         if (!isDragging && !isResizing) return;
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
+        
+        const { x: mouseX, y: mouseY } = getMousePos(canvas, e);
 
         if (isResizing && dragField) {
             hasMoved = true;
@@ -390,11 +397,8 @@ if (canvas) {
             
             const field = dragField.type === 'variable' ? templateMap.fields[dragField.id] : templateMap.coverUps[dragField.id];
             
-            // Calculate new dimensions (min size of 10x10)
             const newW = Math.max(10, initialWidth + deltaX);
             const newH = Math.max(10, initialHeight + deltaY);
-            
-            // Lock the top edge in place while pulling the bottom edge down
             const topEdgePdf = initialY + initialHeight;
             
             field.width = newW;
@@ -438,9 +442,8 @@ if (canvas) {
 
     canvas.addEventListener('mouseup', async (e) => {
         if (e.button !== 0 || !pdfViewport) return;
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
+        
+        const { x: mouseX, y: mouseY } = getMousePos(canvas, e);
 
         if (dragField && dragField.type === 'drawing_new') {
             const pixelW = Math.abs(mouseX - drawStartX);
