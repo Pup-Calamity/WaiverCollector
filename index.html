@@ -307,22 +307,30 @@
                 <select id="templateDropdown" style="margin-bottom: 15px;">
                     <option value="">-- Connect folder to load templates --</option>
                 </select>
-                <button id="deleteTemplateBtn" class="primary-btn" disabled style="background: #dc3545;">Delete Selected Template</button>
+                <button id="deleteTemplateBtn" class="primary-btn" disabled style="background: #dc3545;">Delete Entire Template</button>
             </div>
 
             <!-- Toolbar Card -->
             <div class="card" style="padding: 20px; text-align: left; background: var(--bg-color);">
-                <h3 style="margin-top: 0; font-size: 1.1em; color: var(--text-main);">Tool Selection</h3>
+                <h3 style="margin-top: 0; font-size: 1.1em; color: var(--text-main);">Drawing Tools</h3>
                 <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;">
                     <label style="cursor: pointer; font-weight: bold; color: var(--text-main);">
-                        <input type="radio" name="toolMode" value="variable" checked> 🟢 Click to Add/Move Variables
+                        <input type="radio" name="toolMode" value="variable" checked> 🟢 Draw New Variable Box
                     </label>
                     <label style="cursor: pointer; font-weight: bold; color: var(--text-main);">
-                        <input type="radio" name="toolMode" value="coverup"> ⬜ Click & Drag to Draw Whiteout
+                        <input type="radio" name="toolMode" value="coverup"> ⬜ Draw New Whiteout Box
                     </label>
                 </div>
-                <div style="font-size: 0.85em; color: var(--text-muted);">
-                    <em>Hint: <strong>Right-Click</strong> any green variable or whiteout box to delete it!</em>
+            </div>
+            
+            <!-- NEW: Selected Item Control Panel -->
+            <div class="card" style="padding: 20px; text-align: left; background: var(--surface-color); grid-column: span 2; border-left: 4px solid #3b82f6;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3 style="margin-top: 0; margin-bottom: 5px; font-size: 1.1em; color: var(--text-main);">Current Selection</h3>
+                        <div id="selectionName" style="color: var(--text-muted); font-size: 0.9em;">Nothing selected. Click a box on the canvas.</div>
+                    </div>
+                    <button id="deleteSelectionBtn" class="primary-btn" disabled style="background: #dc3545; width: auto; padding: 8px 20px;">🗑️ Delete Item</button>
                 </div>
             </div>
         </div>
