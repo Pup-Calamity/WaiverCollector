@@ -112,7 +112,7 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
                         <tbody>${invoiceRowsHtml}</tbody>
                     </table>
                     <p>Thank you,</p>
-                    <p>Accounts Payable Team</p>
+                    <p>AR Team</p>
                 </div>
             `;
 
