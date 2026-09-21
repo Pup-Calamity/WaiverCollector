@@ -3,23 +3,30 @@
 const WaiverMath = {
     // --- 1. Email Info Lookup ---
     getEmailInfo: function(job, vendor, headerName) {
-        // Uses 'contractInfo' based on your provided schema
-        const emailData = window.Workspace.appData.contractInfo || []; 
+        const contractData = window.Workspace.appData.contractInfo || [];
+        const vendorData = window.Workspace.appData.vendorInfo || [];
         
-        const matchingRow = emailData.find(row => {
+        const contractRow = contractData.find(row => {
             const rowJob = String(row["Job ID"] || '').trim().toLowerCase();
             const rowVen = String(row["Vendor ID"] || '').trim().toLowerCase();
-            return (rowJob === String(job).trim().toLowerCase() && 
-                    rowVen === String(vendor).trim().toLowerCase());
+            return (rowJob === String(job).trim().toLowerCase() && rowVen === String(vendor).trim().toLowerCase());
         });
 
-        if (!matchingRow || matchingRow[headerName] === undefined) {
-            return "";
+        if (contractRow && contractRow[headerName] !== undefined) return String(contractRow[headerName]);
+
+        if (contractRow) {
+            const region = String(contractRow["Vendor Region"] || '1').trim();
+            const vendorRow = vendorData.find(v => {
+                const vID = String(v["Vendor ID"] || '').trim().toLowerCase();
+                const vReg = String(v["Vendor Region"] || '').trim();
+                return (vID === String(vendor).trim().toLowerCase() && vReg === region);
+            });
+            if (vendorRow && vendorRow[headerName] !== undefined) return String(vendorRow[headerName]);
         }
-        return String(matchingRow[headerName]);
+        return "";
     },
 
-    // --- 2. Amount Summation Engine ---
+    // --- 2. Amount Summation Engine (UPDATED FOR VOIDS) ---
     getAmount: function(job, vendor, firstDay, lastDay, fCheck, invStatus) {
         const invoices = window.Workspace.appData.waiverInvoices || [];
         const onBase = window.Workspace.appData.invInProcessing || [];
@@ -27,10 +34,8 @@ const WaiverMath = {
         
         const start = new Date(firstDay).getTime();
         const end = new Date(lastDay).getTime();
-        
         let total = 0;
 
-        // Sum Invoices Tab (waiverInvoices)
         invoices.forEach(row => {
             const rowJob = String(row["Job ID"] || '').trim();
             const rowVen = String(row["Vendor ID"] || '').trim();
@@ -39,13 +44,19 @@ const WaiverMath = {
             const rowDate = new Date(row["Invoice Date"]).getTime();
             
             let isMatch = (rowJob === job && rowVen === vendor && rowDate >= start && rowDate <= end);
-            if (invStatus !== "<>") isMatch = isMatch && (rowStatus === invStatus);
-            if (!fCheck) isMatch = isMatch && (rowAcct === CRAcct); // If fCheck is false, mandate CR Account
+            
+            // EXACT VBA REPLICATION: Handle Void Logic
+            if (invStatus === "<>V") {
+                isMatch = isMatch && (rowStatus !== "V"); 
+            } else if (invStatus !== "<>") {
+                isMatch = isMatch && (rowStatus === invStatus); 
+            }
+
+            if (!fCheck) isMatch = isMatch && (rowAcct === CRAcct); 
 
             if (isMatch) total += parseFloat(row["AP Amount"] || 0);
         });
 
-        // Sum OnBase Tab (invInProcessing)
         onBase.forEach(row => {
             const rowJob = String(row["jobid"] || '').trim();
             const rowVen = String(row["vendorid"] || '').trim();
@@ -59,7 +70,13 @@ const WaiverMath = {
         return total < 0 ? "0.00" : total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     },
 
-    // --- 3. Unpaid Retention ---
+    // --- 3. Paid Thru Wrapper ---
+    getPaidThru: function(job, vendor, targetDate, fCheck, invStatus) {
+        const beginningOfTime = new Date("1990-01-01");
+        return this.getAmount(job, vendor, beginningOfTime, targetDate, fCheck, invStatus);
+    },
+
+    // --- 4. Unpaid Retention ---
     getUnpaidRetention: function(job, vendor) {
         const invoices = window.Workspace.appData.waiverInvoices || [];
         const CRAcct = "2110000"; 
@@ -78,20 +95,17 @@ const WaiverMath = {
         return total < 0 ? "0.00" : total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     },
 
-    // --- 4. Invoice List Generator (Replaces CreateInvoiceList & Exceptions) ---
+    // --- 5. Invoice List Generator ---
     getInvoiceList: function(job, vendor, firstDay, lastDay, isFinal, returnWithAmounts = false) {
         if (isFinal) return returnWithAmounts ? "" : "Final Lien Waiver";
 
         const invoices = window.Workspace.appData.waiverInvoices || [];
         const onBase = window.Workspace.appData.invInProcessing || [];
-        
         const start = new Date(firstDay).getTime();
         const end = new Date(lastDay).getTime();
-        
-        const uniqueInvoices = new Map(); // Map prevents duplicates and stores the amount
+        const uniqueInvoices = new Map(); 
         let grandTotal = 0;
 
-        // Scan Invoices Tab
         invoices.forEach(row => {
             const rowJob = String(row["Job ID"] || '').trim();
             const rowVen = String(row["Vendor ID"] || '').trim();
@@ -108,7 +122,6 @@ const WaiverMath = {
             }
         });
 
-        // Scan OnBase Tab
         onBase.forEach(row => {
             const rowJob = String(row["jobid"] || '').trim();
             const rowVen = String(row["vendorid"] || '').trim();
@@ -126,20 +139,44 @@ const WaiverMath = {
 
         if (uniqueInvoices.size === 0) return returnWithAmounts ? "" : "No Invoices Found";
 
-        // Format the output
-        if (returnWithAmounts) { // This acts as your "Exceptions" function
+        if (returnWithAmounts) {
             let resultArr = [];
             uniqueInvoices.forEach((amount, invNumber) => {
                 resultArr.push(`${invNumber} - $${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
             });
             return `${resultArr.join(", ")} :   Total = $${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        } else { // Standard CreateInvoiceList output
+        } else {
             return Array.from(uniqueInvoices.keys()).join(", ");
         }
     },
 
-    // --- 5. Spell Number (Number to Words) ---
-    // (This remains entirely math-based, no header changes needed)
+    // --- 6. Exceptions Wrapper ---
+    getExceptions: function(job, vendor, firstDay, lastDay, isFinal) {
+        return this.getInvoiceList(job, vendor, firstDay, lastDay, isFinal, true);
+    },
+
+    // --- 7. Earliest Invoice Date (NEW) ---
+    getFirstDate: function(job, vendor) {
+        const invoices = window.Workspace.appData.waiverInvoices || [];
+        let earliestDate = Infinity;
+
+        invoices.forEach(row => {
+            const rowJob = String(row["Job ID"] || '').trim();
+            const rowVen = String(row["Vendor ID"] || '').trim();
+            
+            if (rowJob === job && rowVen === vendor) {
+                const rowDate = new Date(row["Invoice Date"]).getTime();
+                if (!isNaN(rowDate) && rowDate < earliestDate) {
+                    earliestDate = rowDate;
+                }
+            }
+        });
+
+        if (earliestDate === Infinity) return "No Invoices Found";
+        return new Date(earliestDate).toLocaleDateString('en-US');
+    },
+
+    // --- 8. Spell Number ---
     spellNumber: function(numString) {
         const num = parseFloat(String(numString).replace(/,/g, ''));
         if (isNaN(num)) return "";
@@ -157,17 +194,9 @@ const WaiverMath = {
 
         function convertGroup(n) {
             let str = '';
-            if (n > 99) {
-                str += ones[Math.floor(n / 100)] + ' Hundred ';
-                n %= 100;
-            }
-            if (n > 19) {
-                str += tens[Math.floor(n / 10)] + ' ';
-                n %= 10;
-            }
-            if (n > 0) {
-                str += ones[n] + ' ';
-            }
+            if (n > 99) { str += ones[Math.floor(n / 100)] + ' Hundred '; n %= 100; }
+            if (n > 19) { str += tens[Math.floor(n / 10)] + ' '; n %= 10; }
+            if (n > 0) { str += ones[n] + ' '; }
             return str.trim();
         }
 
@@ -184,7 +213,8 @@ const WaiverMath = {
             tempDollars = Math.floor(tempDollars / 1000);
             scaleIdx++;
         }
-
         return wordStr.trim() + centStr;
     }
 };
+
+window.WaiverMath = WaiverMath;
