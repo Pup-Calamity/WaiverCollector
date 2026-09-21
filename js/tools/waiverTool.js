@@ -62,7 +62,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 launchBtn.innerHTML = originalText; 
             }
 
-            switchView('waiverToolView');
+            switchView('waiverDashboardView');
             populateMonthDropdown(); 
             renderWaiverTable();     
         });
