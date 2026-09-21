@@ -267,8 +267,45 @@ function openVariableModal() {
     });
 }
 
-// --- Canvas Mouse Controls ---
+// --- Canvas Mouse Controls & Selection State ---
 const canvas = document.getElementById('pdfCanvas');
+
+let selectedField = null;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+
+let isResizing = false;
+let initialWidth = 0;
+let initialHeight = 0;
+let initialY = 0; // Anchors the top edge during a resize
+
+function updateSelectionUI() {
+    const nameLabel = document.getElementById('selectionName');
+    const delBtn = document.getElementById('deleteSelectionBtn');
+    if (!nameLabel || !delBtn) return;
+
+    if (!selectedField) {
+        nameLabel.textContent = "Nothing selected. Click a box on the canvas.";
+        delBtn.disabled = true;
+    } else {
+        const name = selectedField.type === 'variable' ? `Variable: [ ${selectedField.id} ]` : `Whiteout Box #${selectedField.id + 1}`;
+        nameLabel.innerHTML = `<strong style="color: var(--brand-color);">${name}</strong><br>Drag the center to move. Drag the bottom-right handle to resize.`;
+        delBtn.disabled = false;
+    }
+}
+
+// Bind Delete Button in UI
+document.getElementById('deleteSelectionBtn')?.addEventListener('click', () => {
+    if (!selectedField) return;
+    if (selectedField.type === 'variable') {
+        delete templateMap.fields[selectedField.id];
+    } else {
+        templateMap.coverUps.splice(selectedField.id, 1);
+    }
+    selectedField = null;
+    updateSelectionUI();
+    redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap, selectedField);
+});
 
 if (canvas) {
     canvas.addEventListener('contextmenu', (e) => {
@@ -276,17 +313,14 @@ if (canvas) {
         if (!pdfViewport) return;
 
         const rect = canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-
-        const target = getHoveredItem(mouseX, mouseY, pdfViewport, templateMap);
-        if (target) {
-            const name = target.type === 'variable' ? `'${target.id}'` : 'this whiteout box';
-            if (confirm(`Delete ${name}?`)) {
-                if (target.type === 'variable') delete templateMap.fields[target.id];
-                else templateMap.coverUps.splice(target.id, 1);
-                redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
-            }
+        const target = getHoveredItem(e.clientX - rect.left, e.clientY - rect.top, pdfViewport, templateMap);
+        
+        if (target && confirm(`Delete this item?`)) {
+            if (target.type === 'variable') delete templateMap.fields[target.id];
+            else templateMap.coverUps.splice(target.id, 1);
+            selectedField = null;
+            updateSelectionUI();
+            redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap, selectedField);
         }
     });
 
@@ -302,10 +336,41 @@ if (canvas) {
         dragField = getHoveredItem(mouseX, mouseY, pdfViewport, templateMap);
         
         if (dragField) { 
-            isDragging = true;
-            hasMoved = false;
+            // Select the item and update UI
+            selectedField = { type: dragField.type, id: dragField.id };
+            updateSelectionUI();
+
+            const field = dragField.type === 'variable' ? templateMap.fields[dragField.id] : templateMap.coverUps[dragField.id];
+
+            if (dragField.action === 'resize') {
+                isResizing = true;
+                isDragging = false;
+                hasMoved = false;
+                drawStartX = mouseX;
+                drawStartY = mouseY;
+                
+                initialWidth = field.width || 60;
+                initialHeight = field.height || 15;
+                initialY = field.y; 
+            } else {
+                isDragging = true;
+                isResizing = false;
+                hasMoved = false;
+                
+                const pdfX = mouseX / pdfViewport.scale;
+                const pdfY = (pdfViewport.height - mouseY) / pdfViewport.scale;
+                dragOffsetX = pdfX - field.x;
+                dragOffsetY = pdfY - field.y;
+            }
+            redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap, selectedField);
         } else {
+            // Clicked empty space - deselect and start drawing new box
+            selectedField = null;
+            updateSelectionUI();
+            redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap, selectedField);
+            
             isDragging = true;
+            isResizing = false;
             dragField = { type: 'drawing_new', tool: currentTool };
             drawStartX = mouseX;
             drawStartY = mouseY;
@@ -313,27 +378,44 @@ if (canvas) {
     });
 
     canvas.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
+        if (!isDragging && !isResizing) return;
         const rect = canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
-        if (dragField && (dragField.type === 'variable' || dragField.type === 'coverUp')) {
+        if (isResizing && dragField) {
+            hasMoved = true;
+            const deltaX = (mouseX - drawStartX) / pdfViewport.scale;
+            const deltaY = (mouseY - drawStartY) / pdfViewport.scale;
+            
+            const field = dragField.type === 'variable' ? templateMap.fields[dragField.id] : templateMap.coverUps[dragField.id];
+            
+            // Calculate new dimensions (min size of 10x10)
+            const newW = Math.max(10, initialWidth + deltaX);
+            const newH = Math.max(10, initialHeight + deltaY);
+            
+            // Lock the top edge in place while pulling the bottom edge down
+            const topEdgePdf = initialY + initialHeight;
+            
+            field.width = newW;
+            field.height = newH;
+            field.y = topEdgePdf - newH;
+
+            redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap, selectedField);
+        }
+        else if (isDragging && dragField && (dragField.type === 'variable' || dragField.type === 'coverup')) {
             hasMoved = true;
             const pdfX = mouseX / pdfViewport.scale;
             const pdfY = (pdfViewport.height - mouseY) / pdfViewport.scale;
 
-            if (dragField.type === 'variable') {
-                templateMap.fields[dragField.id].x = pdfX;
-                templateMap.fields[dragField.id].y = pdfY;
-            } else {
-                templateMap.coverUps[dragField.id].x = pdfX;
-                templateMap.coverUps[dragField.id].y = pdfY;
-            }
-            redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
+            const field = dragField.type === 'variable' ? templateMap.fields[dragField.id] : templateMap.coverUps[dragField.id];
+            field.x = pdfX - dragOffsetX;
+            field.y = pdfY - dragOffsetY;
+            
+            redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap, selectedField);
         } 
-        else if (dragField && dragField.type === 'drawing_new') {
-            redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
+        else if (isDragging && dragField && dragField.type === 'drawing_new') {
+            redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap, selectedField);
             
             const boxX = Math.min(drawStartX, mouseX);
             const boxY = Math.min(drawStartY, mouseY);
@@ -345,7 +427,7 @@ if (canvas) {
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
                 ctx.strokeStyle = '#dc3545';
             } else {
-                ctx.fillStyle = 'rgba(74, 246, 38, 0.3)'; // Green for variables
+                ctx.fillStyle = 'rgba(74, 246, 38, 0.3)'; 
                 ctx.strokeStyle = '#4af626';
             }
             ctx.fillRect(boxX, boxY, boxW, boxH);
@@ -356,7 +438,6 @@ if (canvas) {
 
     canvas.addEventListener('mouseup', async (e) => {
         if (e.button !== 0 || !pdfViewport) return;
-        
         const rect = canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
@@ -374,18 +455,21 @@ if (canvas) {
 
                 if (dragField.tool === 'coverup') {
                     templateMap.coverUps.push({ x: pdfX, y: pdfY, width: pdfW, height: pdfH });
+                    selectedField = { type: 'coverup', id: templateMap.coverUps.length - 1 };
                 } else if (dragField.tool === 'variable') {
                     const variableName = await openVariableModal();
                     if (variableName) {
-                        // SAVE THE WIDTH AND HEIGHT!
                         templateMap.fields[variableName] = { x: pdfX, y: pdfY, width: pdfW, height: pdfH };
+                        selectedField = { type: 'variable', id: variableName };
                     }
                 }
             }
-            redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
+            updateSelectionUI();
+            redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap, selectedField);
         }
         
         isDragging = false;
+        isResizing = false;
         dragField = null;
         hasMoved = false;
     });
