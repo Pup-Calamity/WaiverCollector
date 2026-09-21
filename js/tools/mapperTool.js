@@ -52,12 +52,12 @@ const availableVariables = [
     { id: "barcode", label: "Barcode String" }
 ];
 
-
 import { getPdfJsLib, redrawCanvas, getHoveredItem } from './templateEditor.js';
 
 let pdfViewport = null;
 let templateMap = { fields: {}, coverUps: [] };
 let currentPdfName = "Template"; 
+let currentPdfBytes = null; // NEW: Stores the raw PDF to save later
 let offscreenCanvas = null;
 
 let isDragging = false;
@@ -73,8 +73,6 @@ const deleteTemplateBtn = document.getElementById('deleteTemplateBtn');
 // --- Initialization & UI Routing ---
 window.addEventListener('DOMContentLoaded', () => {
     
-    // We can launch this tool from anywhere you want to add a button in the future.
-    // Assuming you add an id="launchMapperBtn" somewhere in your Hub view:
     const launchBtn = document.getElementById('launchMapperBtn');
     if (launchBtn) {
         launchBtn.addEventListener('click', async () => {
@@ -85,6 +83,7 @@ window.addEventListener('DOMContentLoaded', () => {
             
             switchView('templateMapperView');
             await refreshTemplateList();
+            // REMOVED: loadVariablesList() - we no longer pull from the JSON file!
         });
     }
 
@@ -96,6 +95,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// --- Folder Management & Loading ---
 async function refreshTemplateList() {
     if (!templateDropdown || !window.Workspace.dirHandle) return;
     templateDropdown.innerHTML = '<option value="">-- Load a PDF to map --</option>';
@@ -134,6 +134,8 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
         currentPdfName = file.name;
         
         const arrayBuffer = await file.arrayBuffer();
+        currentPdfBytes = arrayBuffer; // NEW: Store bytes for the Save button
+        
         const pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
         const page = await pdfDoc.getPage(1);
         
@@ -167,7 +169,7 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
         }
         
         redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
-        await refreshTemplateList(); // Refresh list to see if we loaded a known one
+        await refreshTemplateList(); 
         
     } catch (error) { 
         alert(`Error loading PDF: ${error.message}`); 
@@ -178,13 +180,23 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
 document.getElementById('saveMapBtn').addEventListener('click', async () => {
     try {
         const templatesDir = await window.Workspace.dirHandle.getDirectoryHandle('Templates', { create: true });
-        const configName = currentPdfName.replace('.pdf', '_Config.json');
-        const fileHandle = await templatesDir.getFileHandle(configName, { create: true });
-        const writable = await fileHandle.createWritable();
-        await writable.write(JSON.stringify(templateMap, null, 2));
-        await writable.close();
         
-        if (output) output.textContent = `✅ Configuration saved as ${configName}!`;
+        // 1. Save the JSON Config Map
+        const configName = currentPdfName.replace('.pdf', '_Config.json');
+        const configHandle = await templatesDir.getFileHandle(configName, { create: true });
+        const configWritable = await configHandle.createWritable();
+        await configWritable.write(JSON.stringify(templateMap, null, 2));
+        await configWritable.close();
+
+        // 2. NEW: Save a physical copy of the PDF into the Templates folder!
+        if (currentPdfBytes) {
+            const pdfHandle = await templatesDir.getFileHandle(currentPdfName, { create: true });
+            const pdfWritable = await pdfHandle.createWritable();
+            await pdfWritable.write(currentPdfBytes);
+            await pdfWritable.close();
+        }
+        
+        if (output) output.textContent = `✅ Imported PDF & Saved Map: ${currentPdfName}`;
         await refreshTemplateList();
         
     } catch (error) { 
@@ -197,16 +209,28 @@ if (deleteTemplateBtn) {
         const selectedPdf = templateDropdown.value;
         if (!selectedPdf) return;
 
-        if (confirm(`Delete configuration map for ${selectedPdf}? (This will not delete the actual PDF file).`)) {
+        if (confirm(`Delete ${selectedPdf} and its mapping configuration?`)) {
             try {
                 const templatesDir = await window.Workspace.dirHandle.getDirectoryHandle('Templates');
-                const configName = selectedPdf.replace('.pdf', '_Config.json');
-                await templatesDir.removeEntry(configName);
                 
-                if (output) output.textContent = `🗑️ Deleted mapping for ${selectedPdf}.`;
+                // Delete JSON
+                const configName = selectedPdf.replace('.pdf', '_Config.json');
+                await templatesDir.removeEntry(configName).catch(e => console.log("No json to delete"));
+                
+                // Delete PDF
+                await templatesDir.removeEntry(selectedPdf).catch(e => console.log("No pdf to delete"));
+                
+                if (output) output.textContent = `🗑️ Deleted ${selectedPdf}.`;
+                
+                // Clear Canvas
+                const canvas = document.getElementById('pdfCanvas');
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                templateMap = { fields: {}, coverUps: [] };
+                
                 await refreshTemplateList();
             } catch (error) { 
-                alert(`Failed to delete configuration: ${error.message}`); 
+                alert(`Failed to delete: ${error.message}`); 
             }
         }
     });
@@ -278,11 +302,9 @@ if (canvas) {
         dragField = getHoveredItem(mouseX, mouseY, pdfViewport, templateMap);
         
         if (dragField) { 
-            // Clicked an existing box - allow moving it
             isDragging = true;
             hasMoved = false;
         } else {
-            // Start drawing a NEW box (both tools now use click-and-drag)
             isDragging = true;
             dragField = { type: 'drawing_new', tool: currentTool };
             drawStartX = mouseX;
