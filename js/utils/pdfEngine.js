@@ -1,25 +1,22 @@
 // js/utils/pdfEngine.js
 
-// js/utils/helpers.js (or wherever this is stored)
-
 export async function stampWaiverWithConfig(pdfArrayBuffer, vendorData, configJson) {
     if (!window.PDFLib) throw new Error("PDF-lib is not loaded. Check index.html script tags.");
     
-    // Deconstruct degrees from the global PDFLib object
-    const { PDFDocument, rgb, degrees } = window.PDFLib; 
+    const { PDFDocument, rgb, degrees, StandardFonts } = window.PDFLib; 
     
     const pdfDoc = await PDFDocument.load(pdfArrayBuffer);
     const pages = pdfDoc.getPages();
     const firstPage = pages[0]; 
 
-    // 1. Draw Cover-Ups (White Rectangles) FIRST to hide old text
+    // Load the font so we can mathematically measure text width/height
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+    // 1. Draw Cover-Ups
     if (configJson.coverUps) {
         configJson.coverUps.forEach(box => {
             firstPage.drawRectangle({
-                x: box.x,
-                y: box.y,
-                width: box.width,
-                height: box.height,
+                x: box.x, y: box.y, width: box.width, height: box.height,
                 color: rgb(1, 1, 1) // Pure white
             });
         });
@@ -29,28 +26,41 @@ export async function stampWaiverWithConfig(pdfArrayBuffer, vendorData, configJs
     if (configJson.fields) {
         for (const [variableName, coords] of Object.entries(configJson.fields)) {
             
-            // Only stamp if the data actually exists in our dictionary
             const textToPrint = vendorData[variableName] !== undefined ? String(vendorData[variableName]) : "";
             
             if (textToPrint.trim() !== "") {
-                
-                // Check if this specific variable is the barcode
                 const isBarcode = (variableName === "barcode");
+                
+                // --- THE AUTO-SIZE MATH ENGINE ---
+                let finalFontSize = coords.size || 12; // Default fallback
+                
+                // If the user drew a bounding box in the UI with a width & height
+                if (coords.width && coords.height && !isBarcode) {
+                    finalFontSize = coords.height; // Start font size as large as the box height
+                    
+                    // Keep shrinking the font until it fits both Width and Height bounds
+                    while (finalFontSize > 4) {
+                        const textWidth = font.widthOfTextAtSize(textToPrint, finalFontSize);
+                        const textHeight = font.heightAtSize(finalFontSize);
+                        
+                        if (textWidth <= coords.width && textHeight <= coords.height) {
+                            break; // It fits!
+                        }
+                        finalFontSize -= 0.5; // Shrink it and loop again
+                    }
+                }
 
                 firstPage.drawText(textToPrint, {
                     x: coords.x,
                     y: coords.y,
-                    size: coords.size || 12,
-                    color: rgb(0, 0, 0), // Pure black
-                    
-                    // Rotate the barcode 90 degrees; leave everything else flat at 0 degrees
+                    size: finalFontSize,
+                    font: font, // MUST pass the font object to use precise sizing
+                    color: rgb(0, 0, 0),
                     rotate: isBarcode ? degrees(90) : degrees(0)
                 });
             }
         }
     }
 
-    // Return the raw byte array of the new PDF
     return await pdfDoc.save();
-}
 }
