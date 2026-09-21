@@ -1,9 +1,14 @@
 // js/utils/pdfEngine.js
 
+// js/utils/helpers.js (or wherever this is stored)
+
 export async function stampWaiverWithConfig(pdfArrayBuffer, vendorData, configJson) {
     if (!window.PDFLib) throw new Error("PDF-lib is not loaded. Check index.html script tags.");
     
-    const pdfDoc = await window.PDFLib.PDFDocument.load(pdfArrayBuffer);
+    // Deconstruct degrees from the global PDFLib object
+    const { PDFDocument, rgb, degrees } = window.PDFLib; 
+    
+    const pdfDoc = await PDFDocument.load(pdfArrayBuffer);
     const pages = pdfDoc.getPages();
     const firstPage = pages[0]; 
 
@@ -15,7 +20,7 @@ export async function stampWaiverWithConfig(pdfArrayBuffer, vendorData, configJs
                 y: box.y,
                 width: box.width,
                 height: box.height,
-                color: window.PDFLib.rgb(1, 1, 1) // Pure white
+                color: rgb(1, 1, 1) // Pure white
             });
         });
     }
@@ -28,11 +33,18 @@ export async function stampWaiverWithConfig(pdfArrayBuffer, vendorData, configJs
             const textToPrint = vendorData[variableName] !== undefined ? String(vendorData[variableName]) : "";
             
             if (textToPrint.trim() !== "") {
+                
+                // Check if this specific variable is the barcode
+                const isBarcode = (variableName === "barcode");
+
                 firstPage.drawText(textToPrint, {
                     x: coords.x,
                     y: coords.y,
                     size: coords.size || 12,
-                    color: window.PDFLib.rgb(0, 0, 0) // Pure black
+                    color: rgb(0, 0, 0), // Pure black
+                    
+                    // Rotate the barcode 90 degrees; leave everything else flat at 0 degrees
+                    rotate: isBarcode ? degrees(90) : degrees(0)
                 });
             }
         }
@@ -40,4 +52,5 @@ export async function stampWaiverWithConfig(pdfArrayBuffer, vendorData, configJs
 
     // Return the raw byte array of the new PDF
     return await pdfDoc.save();
+}
 }
