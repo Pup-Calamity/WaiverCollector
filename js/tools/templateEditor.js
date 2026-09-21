@@ -14,45 +14,48 @@ export function getPdfJsLib() {
  * Redraws the entire canvas frame. 
  * Layers: Base PDF -> Whiteout Cover-ups -> Green Variables
  */
-export function redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap) {
-    if (!pdfViewport || !offscreenCanvas) return;
+export function redrawCanvas(canvas, bgCanvas, viewport, map) {
     const ctx = canvas.getContext('2d');
-    
-    // 1. Wipe clean and draw base PDF from the offscreen buffer
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(offscreenCanvas, 0, 0);
+    if (bgCanvas) ctx.drawImage(bgCanvas, 0, 0);
 
-    // 2. Draw Cover-Ups (White with red boundary for editing visibility)
-    if (templateMap.coverUps) {
-        templateMap.coverUps.forEach(box => {
-            const htmlX = box.x * pdfViewport.scale;
-            // Convert PDF bottom-left origin to Canvas top-left origin
-            const htmlY = pdfViewport.height - (box.y * pdfViewport.scale) - (box.height * pdfViewport.scale);
-            const htmlW = box.width * pdfViewport.scale;
-            const htmlH = box.height * pdfViewport.scale;
-
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-            ctx.fillRect(htmlX, htmlY, htmlW, htmlH);
-            ctx.strokeStyle = '#dc3545'; // Bootstrap Danger Red
-            ctx.strokeRect(htmlX, htmlY, htmlW, htmlH);
+    // Draw coverups
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.strokeStyle = '#dc3545';
+    ctx.lineWidth = 2;
+    if (map.coverUps) {
+        map.coverUps.forEach(box => {
+            const px = box.x * viewport.scale;
+            const py = viewport.height - (box.y * viewport.scale) - (box.height * viewport.scale);
+            const pw = box.width * viewport.scale;
+            const ph = box.height * viewport.scale;
+            ctx.fillRect(px, py, pw, ph);
+            ctx.strokeRect(px, py, pw, ph);
         });
     }
 
-    // 3. Draw Variables (Green highlight blocks)
-    if (templateMap.fields) {
-        for (const [variableName, coords] of Object.entries(templateMap.fields)) {
-            const htmlX = coords.x * pdfViewport.scale;
-            const htmlY = pdfViewport.height - (coords.y * pdfViewport.scale);
+    // Draw variables (Now drawing full boxes!)
+    ctx.lineWidth = 2;
+    if (map.fields) {
+        for (const [key, field] of Object.entries(map.fields)) {
+            const px = field.x * viewport.scale;
+            // Use field height if available, fallback to 15 if it's an old legacy dot
+            const ph = (field.height || 15) * viewport.scale;
+            const py = viewport.height - (field.y * viewport.scale) - ph;
+            const pw = (field.width || 60) * viewport.scale;
+
+            ctx.fillStyle = 'rgba(74, 246, 38, 0.3)';
+            ctx.strokeStyle = '#4af626';
+            ctx.fillRect(px, py, pw, ph);
+            ctx.strokeRect(px, py, pw, ph);
             
-            ctx.fillStyle = 'rgba(74, 246, 38, 0.5)';
-            ctx.fillRect(htmlX, htmlY - 14, 120, 18);
-            ctx.fillStyle = 'black';
-            ctx.font = '14px Arial';
-            ctx.fillText(variableName, htmlX + 4, htmlY - 1);
+            // Draw variable text inside the box
+            ctx.fillStyle = '#000';
+            ctx.font = '12px Arial';
+            ctx.fillText(key, px + 2, py + 14);
         }
     }
 }
-
 /**
  * Checks if the mouse coordinates intersect with any drawn objects.
  * Returns the object type and ID, or null if clicking empty space.
