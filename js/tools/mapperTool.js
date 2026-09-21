@@ -243,7 +243,13 @@ function openVariableModal() {
         const confirmBtn = document.getElementById('confirmVariableBtn');
         const cancelBtn = document.getElementById('cancelVariableBtn');
 
-        select.innerHTML = availableVariables.map(v => `<option value="${v}">${v}</option>`).join('');
+        select.innerHTML = availableVariables.map(v => {
+            if (typeof v === 'string') {
+                return `<option value="${v}">${v}</option>`;
+            }
+            return `<option value="${v.id}">${v.label}</option>`;
+        }).join('');
+        
         modal.showModal();
 
         const onConfirm = () => { cleanup(); resolve(select.value); };
