@@ -214,13 +214,24 @@ window.batchProcessWaivers = async function(jobId, vendorList, targetMonth, targ
             finalAmount = manualInput;
         }
 
-        // --- 5. Construct the Full VBA Payload ---
+        // --- 5. Construct the Full Payload ---
             
             // Basic Info
             const vendorName = WaiverMath.getEmailInfo(jobId, vendorId, "Vendor Name");
             const vendorEmail = WaiverMath.getEmailInfo(jobId, vendorId, "Region Email");
             const jobName = WaiverMath.getEmailInfo(jobId, vendorId, "Job Name");
-            const burgName = String(jobSettings["BURG Name"] || "");
+            
+            // Grab BURG Name from jobInfo instead of jobNotes
+            const jobData = window.Workspace.appData.jobInfo.find(j => String(j["Job ID"]).trim().toLowerCase() === String(jobId).trim().toLowerCase()) || {};
+            const burgName = String(jobData["BURG Name"] || "").trim();
+
+            // Determine OU Name (Dynamic LLC routing)
+            let ouName = "Lithko Contracting LLC";
+            if (burgName === "Lithko TX" || burgName === "Austin") ouName = "Lithko TX";
+            if (burgName === "UCS COLUMBUS") ouName = "Unlimited Contracting Solutions";
+            if (burgName === "FRONTLINE BURG") ouName = "Frontline Concrete Contracting";
+            if (burgName === "PIKUS BURG") ouName = "Pikus Concrete Contracting";
+            if (burgName === "Full-Tilt Burg") ouName = "Full Tilt Contracting, LLC";
 
             // Location
             const jobAddress = WaiverMath.getEmailInfo(jobId, vendorId, "Job Address");
@@ -245,17 +256,10 @@ window.batchProcessWaivers = async function(jobId, vendorList, targetMonth, targ
             const prevEndDay = new Date(prevMathYear, prevMathMonth + 1, 0);
             const prevAmount = WaiverMath.getAmount(jobId, vendorId, prevStartDay, prevEndDay, isFinal, "<>V");
 
-            // Determine OU Name (Dynamic LLC routing)
-            let ouName = "Lithko Contracting LLC";
-            if (burgName === "Lithko TX" || burgName === "Austin") ouName = "Lithko TX";
-            if (burgName === "UCS COLUMBUS") ouName = "Unlimited Contracting Solutions";
-            if (burgName === "FRONTLINE BURG") ouName = "Frontline Concrete Contracting";
-            if (burgName === "PIKUS BURG") ouName = "Pikus Concrete Contracting";
-            if (burgName === "Full-Tilt Burg") ouName = "Full Tilt Contracting, LLC";
-
             // Paid vs Unpaid for the Period
             const clearedPaidAmount = WaiverMath.getAmount(jobId, vendorId, startDay, endingDay, isFinal, "C");
-            const pendingUnpaidAmount = WaiverMath.getUnpaidRetention(jobId, vendorId); // Translating the VBA "C" filter approximation
+            const pendingUnpaidAmount = WaiverMath.getAmount(jobId, vendorId, startDay, endingDay, isFinal, "<>C");
+            const retention = WaiverMath.getUnpaidRetention(jobId, vendorId); // Translating the VBA "C" filter approximation
 
             // Invoices 
             const currentInvoices = WaiverMath.getInvoiceList(jobId, vendorId, startDay, endingDay, isFinal);
@@ -276,6 +280,7 @@ window.batchProcessWaivers = async function(jobId, vendorList, targetMonth, targ
                 "paidAmountWords": WaiverMath.spellNumber(clearedPaidAmount),
                 "unpaidAmount": pendingUnpaidAmount,
                 "unpaidAmountWords": WaiverMath.spellNumber(pendingUnpaidAmount),
+                "retention": retention,
                 "contractAmount": contractAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }),
                 "remainingBalance": remainingBalance.toLocaleString('en-US', { minimumFractionDigits: 2 }),
 
