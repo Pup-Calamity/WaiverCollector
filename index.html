@@ -96,49 +96,91 @@
     </div>
 
     <!-- VIEW 4: Waiver Processor Tool -->
-    <div id="waiverToolView" class="view-section hub-section">
+   <!-- VIEW: Master Waiver Dashboard -->
+    <div id="waiverDashboardView" class="view-section hub-section">
+        
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <div>
-                <h2>📝 Waiver Processor</h2>
-                <p class="subtitle" style="margin-bottom: 0;">Manage and track vendor lien waivers.</p>
+                <h2>📄 Master Waiver Dashboard</h2>
+                <p class="subtitle" style="margin-bottom: 0;">Search, filter, and track waiver statuses in real-time.</p>
             </div>
-            <button id="backToHubBtn" class="icon-btn" style="width: auto; padding: 10px 20px; border-radius: 8px;">
+            <button id="backToHubFromDashboardBtn" class="icon-btn" style="width: auto; padding: 10px 20px; border-radius: 8px;">
                 ← Back to Hub
             </button>
         </div>
+        
         <hr>
-        <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-            <input type="text" id="waiverSearch" placeholder="Search Job ID or Vendor..." style="margin-bottom: 0; flex-grow: 1;">
-            <select id="waiverMonthFilter" style="margin-bottom: 0; width: 180px;">
-                <option value="ALL">All Months</option>
-            </select>
-            <select id="waiverStatusFilter" style="margin-bottom: 0; width: 200px;">
-                <option value="ALL">All Waivers</option>
-                <option value="PENDING">Pending (Not Received)</option>
-                <option value="RECEIVED">Received</option>
-            </select>
-            <button id="refreshWaiversBtn" class="primary-btn" style="width: auto; margin: 0;">Refresh Data</button>
-            <button id="openCustomWaiverBtn" class="primary-btn" style="width: auto; margin: 0; background: #10b981;">+ One Time Waiver</button>
+
+        <!-- Search & Filter Control Panel -->
+        <div class="card" style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end; padding: 20px; margin-bottom: 20px; background: var(--surface-color);">
+            <div style="flex: 1; min-width: 250px;">
+                <label style="font-weight: bold; font-size: 0.85em; color: var(--text-muted); display: block; margin-bottom: 5px;">Search (Job, Vendor, Customer)</label>
+                <input type="text" id="dashboardSearch" placeholder="Type an ID or name..." style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);">
+            </div>
+            
+            <div>
+                <label style="font-weight: bold; font-size: 0.85em; color: var(--text-muted); display: block; margin-bottom: 5px;">Month</label>
+                <select id="dashboardMonth" style="padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);">
+                    <option value="">All Months</option>
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                </select>
+            </div>
+            
+            <div>
+                <label style="font-weight: bold; font-size: 0.85em; color: var(--text-muted); display: block; margin-bottom: 5px;">Year</label>
+                <select id="dashboardYear" style="padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);">
+                    <option value="">All Years</option>
+                    <!-- Filled dynamically by JS -->
+                </select>
+            </div>
+
+            <button id="openBatchGeneratorBtn" class="primary-btn" style="background: #10b981; width: auto; padding: 10px 20px;">
+                🚀 Run Batch Generator
+            </button>
         </div>
 
-        <div style="background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; box-shadow: var(--card-shadow);">
-            <table style="width: 100%; border-collapse: collapse; text-align: left;">
-                <thead>
-                    <tr style="background: var(--bg-color); border-bottom: 2px solid var(--border-color);">
-                        <th style="padding: 15px; font-weight: 600; color: var(--text-muted);">Job ID</th>
-                        <th style="padding: 15px; font-weight: 600; color: var(--text-muted);">Vendor ID</th>
-                        <th style="padding: 15px; font-weight: 600; color: var(--text-muted);">Waiver Month</th>
-                        <th style="padding: 15px; font-weight: 600; color: var(--text-muted);">Sent Date</th>
-                        <th style="padding: 15px; font-weight: 600; color: var(--text-muted);">Status</th>
-                        <th style="padding: 15px; font-weight: 600; color: var(--text-muted);">Action</th>
+        <!-- Data Table -->
+        <div style="overflow-x: auto; background: var(--surface-color); border-radius: 8px; border: 1px solid var(--border-color); box-shadow: var(--card-shadow);">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9em;">
+                <thead style="background: var(--bg-color); border-bottom: 2px solid var(--border-color);">
+                    <tr>
+                        <th style="padding: 15px; color: var(--text-muted);">Key (ID)</th>
+                        <th style="padding: 15px; color: var(--text-muted);">Job</th>
+                        <th style="padding: 15px; color: var(--text-muted);">Vendor</th>
+                        <th style="padding: 15px; color: var(--text-muted);">Waiver Month</th>
+                        <th style="padding: 15px; color: var(--text-muted);">Status</th>
+                        <th style="padding: 15px; color: var(--text-muted);">Sent</th>
+                        <th style="padding: 15px; color: var(--text-muted);">Returned</th>
+                        <th style="padding: 15px; color: var(--text-muted);">Action Date</th>
+                        <th style="padding: 15px; color: var(--text-muted); text-align: center;">Notes</th>
                     </tr>
                 </thead>
-                <tbody id="waiverTableBody">
-                    <tr><td colspan="6" style="padding: 30px; text-align: center; color: var(--text-muted);">No data loaded.</td></tr>
+                <tbody id="waiverTableBody" style="color: var(--text-main);">
+                    <!-- Rows injected by JavaScript -->
                 </tbody>
             </table>
         </div>
     </div>
+
+    <!-- Read Notes Modal -->
+    <dialog id="readNotesModal" style="padding: 25px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--surface-color); width: 450px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        <h3 style="margin-top: 0; color: var(--text-main); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">Waiver Notes</h3>
+        <p id="notesModalContent" style="white-space: pre-wrap; color: var(--text-main); font-size: 14px; min-height: 80px; padding: 15px; background: var(--bg-color); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 20px;"></p>
+        <div style="display: flex; justify-content: flex-end;">
+            <button id="closeNotesModalBtn" class="primary-btn" style="width: auto; background: #6c757d;">Close</button>
+        </div>
+    </dialog>
 
     <!-- VIEW 5: Automated Email Tool -->
     <div id="emailToolView" class="view-section hub-section">
