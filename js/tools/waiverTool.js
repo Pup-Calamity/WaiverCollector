@@ -214,6 +214,109 @@ window.batchProcessWaivers = async function(jobId, vendorList, targetMonth, targ
             finalAmount = manualInput;
         }
 
+        // --- 5. Construct the Full VBA Payload ---
+            
+            // Basic Info
+            const vendorName = WaiverMath.getEmailInfo(jobId, vendorId, "Vendor Name");
+            const vendorEmail = WaiverMath.getEmailInfo(jobId, vendorId, "Region Email");
+            const jobName = WaiverMath.getEmailInfo(jobId, vendorId, "Job Name");
+            const burgName = String(jobSettings["BURG Name"] || "");
+
+            // Location
+            const jobAddress = WaiverMath.getEmailInfo(jobId, vendorId, "Job Address");
+            const jobCity = WaiverMath.getEmailInfo(jobId, vendorId, "Job City");
+            const jobState = WaiverMath.getEmailInfo(jobId, vendorId, "Job State");
+            const jobZip = WaiverMath.getEmailInfo(jobId, vendorId, "Job Zip");
+            const fullProjectAddress = `${jobAddress}, ${jobCity}, ${jobState} ${jobZip}`;
+
+            // Contract & Balances
+            const contractAmount = parseFloat(WaiverMath.getEmailInfo(jobId, vendorId, "Contract Amount").replace(/,/g, '')) || 0;
+            const paidThruEnd = parseFloat(WaiverMath.getPaidThru(jobId, vendorId, endingDay, isFinal, "<>V").replace(/,/g, '')) || 0;
+            const paidThruStart = parseFloat(WaiverMath.getPaidThru(jobId, vendorId, startDay, isFinal, "<>V").replace(/,/g, '')) || 0;
+            
+            let remainingBalance = contractAmount - paidThruEnd;
+            if (remainingBalance < 0) remainingBalance = 0;
+
+            // Previous Period Math
+            let prevMathMonth = mathMonth - 1;
+            let prevMathYear = mathYear;
+            if (prevMathMonth < 0) { prevMathMonth = 11; prevMathYear -= 1; }
+            const prevStartDay = new Date(prevMathYear, prevMathMonth, 1);
+            const prevEndDay = new Date(prevMathYear, prevMathMonth + 1, 0);
+            const prevAmount = WaiverMath.getAmount(jobId, vendorId, prevStartDay, prevEndDay, isFinal, "<>V");
+
+            // Determine OU Name (Dynamic LLC routing)
+            let ouName = "Lithko Contracting LLC";
+            if (burgName === "Lithko TX" || burgName === "Austin") ouName = "Lithko TX";
+            if (burgName === "UCS COLUMBUS") ouName = "Unlimited Contracting Solutions";
+            if (burgName === "FRONTLINE BURG") ouName = "Frontline Concrete Contracting";
+            if (burgName === "PIKUS BURG") ouName = "Pikus Concrete Contracting";
+            if (burgName === "Full-Tilt Burg") ouName = "Full Tilt Contracting, LLC";
+
+            // Paid vs Unpaid for the Period
+            const clearedPaidAmount = WaiverMath.getAmount(jobId, vendorId, startDay, endingDay, isFinal, "C");
+            const pendingUnpaidAmount = WaiverMath.getUnpaidRetention(jobId, vendorId); // Translating the VBA "C" filter approximation
+
+            // Invoices 
+            const currentInvoices = WaiverMath.getInvoiceList(jobId, vendorId, startDay, endingDay, isFinal);
+            const prevInvoices = WaiverMath.getInvoiceList(jobId, vendorId, prevStartDay, prevEndDay, isFinal);
+
+            // Construct the ultimate map
+            const mappingData = {
+                // Amounts
+                "amount": finalAmount,
+                "amountWords": WaiverMath.spellNumber(finalAmount),
+                "previousperiod": prevAmount,
+                "previousperiodWords": WaiverMath.spellNumber(prevAmount),
+                "ContractPaid": paidThruStart.toLocaleString('en-US', { minimumFractionDigits: 2 }),
+                "conPaidWords": WaiverMath.spellNumber(paidThruStart),
+                "Cumulative": paidThruEnd.toLocaleString('en-US', { minimumFractionDigits: 2 }),
+                "CumulativeWords": WaiverMath.spellNumber(paidThruEnd),
+                "paidAmount": clearedPaidAmount,
+                "paidAmountWords": WaiverMath.spellNumber(clearedPaidAmount),
+                "unpaidAmount": pendingUnpaidAmount,
+                "unpaidAmountWords": WaiverMath.spellNumber(pendingUnpaidAmount),
+                "contractAmount": contractAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }),
+                "remainingBalance": remainingBalance.toLocaleString('en-US', { minimumFractionDigits: 2 }),
+
+                // Entities
+                "OUName": ouName,
+                "subcontractor": vendorName,
+                "subcontractorAddress": WaiverMath.getEmailInfo(jobId, vendorId, "Vendor Address"),
+                "owner": WaiverMath.getEmailInfo(jobId, vendorId, "Owner"),
+                "GCName": WaiverMath.getEmailInfo(jobId, vendorId, "GC Name"),
+                "GCNumber": WaiverMath.getEmailInfo(jobId, vendorId, "GC Number"),
+                
+                // Project
+                "project": jobName,
+                "projNum": jobId,
+                "projectAddress": fullProjectAddress,
+                "addressOnly": jobAddress,
+                "city": jobCity,
+                "state": jobState,
+                "zip": jobZip,
+                "county": WaiverMath.getEmailInfo(jobId, vendorId, "Job County"),
+                "SubcontractScope": WaiverMath.getEmailInfo(jobId, vendorId, "Subcontract Description"),
+                "ContractDate": WaiverMath.getEmailInfo(jobId, vendorId, "ContractDate"),
+
+                // Dates
+                "startdate": startDay.toLocaleDateString(),
+                "throughDate": endingDay.toLocaleDateString(),
+                "paidThruDate": new Date(startDay.getTime() - 86400000).toLocaleDateString(), // Day before start date
+                "day": endingDay.getDate().toString(),
+                "month": endingDay.toLocaleString('default', { month: 'long' }),
+                "year": endingDay.getFullYear().toString(),
+                "dueDate": dueDate.toLocaleDateString(),
+                
+                // Lists
+                "invoices": currentInvoices,
+                "PrevInvoices": prevInvoices,
+                "exceptions": WaiverMath.getExceptions(jobId, vendorId, startDay, endingDay, isFinal),
+
+                // Barcode String
+                "barcode": `${jobId} ${vendorId.padStart(10, '0')} ${endingDay.toLocaleDateString('en-US', {month: '2-digit', year: '2-digit'}).replace('/', '')} |${endingDay.toLocaleDateString('en-US', {month: '2-digit'})}`
+            };
+
         try {
             // Load PDF and Config
             const pdfFileHandle = await templatesDir.getFileHandle(`${templateName}.pdf`);
