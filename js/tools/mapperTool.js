@@ -85,7 +85,6 @@ window.addEventListener('DOMContentLoaded', () => {
             
             switchView('templateMapperView');
             await refreshTemplateList();
-            await loadVariablesList();
         });
     }
 
@@ -96,28 +95,6 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
-
-// --- Folder Management & Loading ---
-async function loadVariablesList() {
-    if (!window.Workspace.dirHandle) return;
-    
-    try {
-        const dataDir = await window.Workspace.dirHandle.getDirectoryHandle('Data', { create: true });
-        const varFile = await dataDir.getFileHandle('variables.json', { create: true });
-        const file = await varFile.getFile();
-        const text = await file.text();
-        
-        if (text.trim() !== '') {
-            availableVariables = JSON.parse(text);
-        } else {
-            const writable = await varFile.createWritable();
-            await writable.write(JSON.stringify(availableVariables, null, 2));
-            await writable.close();
-        }
-    } catch (e) {
-        console.error("Failed to load variables.json. Using defaults.", e);
-    }
-}
 
 async function refreshTemplateList() {
     if (!templateDropdown || !window.Workspace.dirHandle) return;
