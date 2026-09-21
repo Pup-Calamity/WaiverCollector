@@ -22,10 +22,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // Filter Listeners (Trigger live updates)
     const searchBox = document.getElementById('dashboardSearch');
+    const statusBox = document.getElementById('dashboardStatus'); 
     const monthBox = document.getElementById('dashboardMonth');
     const yearBox = document.getElementById('dashboardYear');
 
     if (searchBox) searchBox.addEventListener('input', renderWaiverTable);
+    if (statusBox) statusBox.addEventListener('change', renderWaiverTable); 
     if (monthBox) monthBox.addEventListener('change', renderWaiverTable);
     if (yearBox) yearBox.addEventListener('change', renderWaiverTable);
 
@@ -76,10 +78,12 @@ window.renderWaiverTable = function() {
 
     // Safely get values (fall back to empty strings if HTML elements are missing)
     const searchInput = document.getElementById('dashboardSearch');
+    const statusInput = document.getElementById('dashboardStatus'); 
     const monthInput = document.getElementById('dashboardMonth');
     const yearInput = document.getElementById('dashboardYear');
 
     const searchVal = searchInput ? searchInput.value.toLowerCase() : "";
+    const statusVal = statusInput ? statusInput.value.toLowerCase() : ""; 
     const monthVal = monthInput ? monthInput.value : "";
     const yearVal = yearInput ? yearInput.value : "";
 
@@ -95,6 +99,7 @@ window.renderWaiverTable = function() {
         const jobId = String(row["Job ID"] || "").trim();
         const vendorId = String(row["Vendor ID"] || "").trim();
         const customerId = String(row["Customer ID"] || "").trim();
+        const rowStatusRaw = String(row["Status"] || "").trim();
         
         let jobName = "Unknown Job";
         let vendorName = "Unknown Vendor";
@@ -109,26 +114,37 @@ window.renderWaiverTable = function() {
             console.warn("⚠️ WaiverMath lookup failed. Check if waiverMath.js is loaded.", error);
         }
 
-        // 1. FILTER: Month & Year
+        // 1. FILTER: Status
+        if (statusVal) {
+            const checkStatus = rowStatusRaw.toLowerCase();
+            if (statusVal === "held") {
+                if (!checkStatus.includes("held")) continue; // catches Held-Approval and Held-Rejected
+            } else if (statusVal === "received") {
+                if (checkStatus !== "received" && checkStatus !== "paid") continue;
+            } else {
+                if (checkStatus !== statusVal) continue;
+            }
+        }
+
+        // 2. FILTER: Month & Year
         if (monthVal && String(row["Month"]).trim() !== monthVal) continue;
         if (yearVal && String(row["Year"]).trim() !== yearVal) continue;
 
-        // 2. FILTER: Search Bar (Checks IDs and Names)
+        // 3. FILTER: Search Bar (Checks IDs and Names)
         const searchString = `${jobId} ${jobName} ${vendorId} ${vendorName} ${customerId}`.toLowerCase();
         if (searchVal && !searchString.includes(searchVal)) continue;
 
         matchCount++;
         if (matchCount > 200) break; // Limit to 200 rows for DOM performance
 
-        // 3. Format Status Color Bubble
-        const status = String(row["Status"] || "").trim();
+        // 4. Format Status Color Bubble
         let statusStyle = "background: #e2e8f0; color: #475569;"; // Default gray
-        if (status.toLowerCase() === "ready") statusStyle = "background: #dbeafe; color: #1d4ed8;";
-        if (status.toLowerCase() === "sent") statusStyle = "background: #fef9c3; color: #854d0e;";
-        if (status.toLowerCase() === "received" || status.toLowerCase() === "paid") statusStyle = "background: #dcfce7; color: #15803d;";
-        if (status.toLowerCase().includes("held")) statusStyle = "background: #fee2e2; color: #b91c1c;";
+        if (rowStatusRaw.toLowerCase() === "ready") statusStyle = "background: #dbeafe; color: #1d4ed8;";
+        if (rowStatusRaw.toLowerCase() === "sent") statusStyle = "background: #fef9c3; color: #854d0e;";
+        if (rowStatusRaw.toLowerCase() === "received" || rowStatusRaw.toLowerCase() === "paid") statusStyle = "background: #dcfce7; color: #15803d;";
+        if (rowStatusRaw.toLowerCase().includes("held")) statusStyle = "background: #fee2e2; color: #b91c1c;";
 
-        // 4. Convert Month Number to Name
+        // 5. Convert Month Number to Name
         const monthNum = parseInt(row["Month"]);
         const displayMonth = !isNaN(monthNum) && monthNum >= 1 && monthNum <= 12 ? monthNames[monthNum] : row["Month"];
 
@@ -147,7 +163,7 @@ window.renderWaiverTable = function() {
             </td>
             <td style="padding: 12px;">${displayMonth}</td>
             <td style="padding: 12px;">
-                <span style="padding: 4px 8px; border-radius: 12px; font-size: 0.85em; font-weight: bold; ${statusStyle}">${status}</span>
+                <span style="padding: 4px 8px; border-radius: 12px; font-size: 0.85em; font-weight: bold; ${statusStyle}">${rowStatusRaw}</span>
             </td>
             <td style="padding: 12px;">${row["Sent Date"] || "-"}</td>
             <td style="padding: 12px;">${row["Received Date"] || "-"}</td>
