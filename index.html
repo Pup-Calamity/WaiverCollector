@@ -157,6 +157,8 @@
                 <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted); display: block; margin-bottom: 5px;">Report Type</label>
                 <select id="emailReportType" style="margin-bottom: 0; width: 250px;">
                     <option value="APPROVAL_REMINDERS">AP03 Approval Reminders</option>
+                    <option value="REJECTED_REMINDERS">Rejected Invoice Reminders</option>
+                    <option value="MISSING_WAIVERS">Missing Waiver Requests</option>
                 </select>
             </div>
             <div>
@@ -303,7 +305,7 @@
     <script src="js/utils/waiverMath.js"></script>
 
     <!-- Email Scripts -->
-    <script src="js/tools/emails/approvalReminders.js?v-2"></script>
+    <script src="js/tools/emails/queueReminders.js"></script>
     
     <!-- Tool Scripts -->
     <script src="js/tools/waiverTool.js"></script>
