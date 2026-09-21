@@ -335,15 +335,7 @@
             </div>
         </div>
         
-        <div style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 10px;">
-            <button id="prevPageBtn" class="primary-btn" disabled style="width: auto; background: #6c757d; padding: 6px 15px;">◀ Prev</button>
-            <span id="pageIndicator" style="font-weight: bold; color: var(--text-main); font-size: 1.1em;">Page 1 of 1</span>
-            <button id="nextPageBtn" class="primary-btn" disabled style="width: auto; background: #6c757d; padding: 6px 15px;">Next ▶</button>
-        </div>
-
-        <div style="background: white; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; display: flex; justify-content: center; padding: 20px;">
-            <canvas id="pdfCanvas" style="border: 1px solid #ccc; max-width: 100%; cursor: crosshair; user-select: none;"></canvas>
-        </div>
+        
         <div style="display: flex; gap: 15px; margin-bottom: 20px;">
             <button id="loadPdfBtn" class="primary-btn" style="width: auto;">Load PDF to Canvas</button>
             <button id="saveMapBtn" class="primary-btn" disabled style="width: auto; background: #10b981;">Save JSON Map</button>
@@ -351,6 +343,12 @@
         
         <div id="output" style="background: #1e1e1e; color: #4af626; padding: 15px; border-radius: 8px; font-family: monospace; height: 60px; overflow-y: auto; margin-bottom: 15px;">System Ready. Load a PDF to begin.</div>
         
+        <div style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 10px;">
+            <button id="prevPageBtn" class="primary-btn" disabled style="width: auto; background: #6c757d; padding: 6px 15px;">◀ Prev</button>
+            <span id="pageIndicator" style="font-weight: bold; color: var(--text-main); font-size: 1.1em;">Page 1 of 1</span>
+            <button id="nextPageBtn" class="primary-btn" disabled style="width: auto; background: #6c757d; padding: 6px 15px;">Next ▶</button>
+        </div>
+
         <div style="background: white; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; display: flex; justify-content: center; padding: 20px;">
             <canvas id="pdfCanvas" style="border: 1px solid #ccc; max-width: 100%; cursor: crosshair; user-select: none;"></canvas>
         </div>
