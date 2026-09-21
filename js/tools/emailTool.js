@@ -51,12 +51,18 @@ window.addEventListener('DOMContentLoaded', () => {
                 // --- THE ROUTER ---
                 if (reportType === "APPROVAL_REMINDERS") {
                     logMsg(`Starting AP03 Approval Reminders for ${targetMonth}/${targetYear}...`);
+                    // Call the function with the "APPROVAL" flag
+                    await batchProcessQueueReminders(targetMonth, targetYear, logMsg, "APPROVAL");
                     
-                    // Calls the function from js/tools/emails/approvalReminders.js
-                    await batchProcessApprovalReminders(targetMonth, targetYear, logMsg);
+                } else if (reportType === "REJECTED_REMINDERS") {
+                    logMsg(`Starting Rejected Invoice Reminders for ${targetMonth}/${targetYear}...`);
+                    // Call the same function, but trigger the "REJECTED" logic!
+                    await batchProcessQueueReminders(targetMonth, targetYear, logMsg, "REJECTED");
+
+                } else if (reportType === "MISSING_WAIVERS") {
+                    logMsg(`Starting Missing Waiver Requests for ${targetMonth}/${targetYear}...`);
+                    await batchProcessInvoicesEmail(targetMonth, targetYear, logMsg);
                     
-                } else if (reportType === "ANOTHER_REPORT_HERE") {
-                    // await anotherReportFunction(targetMonth, targetYear, logMsg);
                 } else {
                     logMsg(`Report type ${reportType} is not set up yet.`, true);
                 }
