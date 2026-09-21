@@ -294,12 +294,14 @@ if (canvas) {
         
         dragField = getHoveredItem(mouseX, mouseY, pdfViewport, templateMap);
         
-        if (dragField && dragField.type === 'variable') {
+        if (dragField) { 
+            // Clicked an existing box - allow moving it
             isDragging = true;
             hasMoved = false;
-        } else if (currentTool === 'coverup') {
+        } else {
+            // Start drawing a NEW box (both tools now use click-and-drag)
             isDragging = true;
-            dragField = { type: 'drawing_coverup' };
+            dragField = { type: 'drawing_new', tool: currentTool };
             drawStartX = mouseX;
             drawStartY = mouseY;
         }
@@ -311,15 +313,21 @@ if (canvas) {
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
-        if (dragField && dragField.type === 'variable') {
+        if (dragField && (dragField.type === 'variable' || dragField.type === 'coverUp')) {
             hasMoved = true;
             const pdfX = mouseX / pdfViewport.scale;
             const pdfY = (pdfViewport.height - mouseY) / pdfViewport.scale;
-            templateMap.fields[dragField.id].x = pdfX;
-            templateMap.fields[dragField.id].y = pdfY;
+
+            if (dragField.type === 'variable') {
+                templateMap.fields[dragField.id].x = pdfX;
+                templateMap.fields[dragField.id].y = pdfY;
+            } else {
+                templateMap.coverUps[dragField.id].x = pdfX;
+                templateMap.coverUps[dragField.id].y = pdfY;
+            }
             redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
         } 
-        else if (dragField && dragField.type === 'drawing_coverup') {
+        else if (dragField && dragField.type === 'drawing_new') {
             redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
             
             const boxX = Math.min(drawStartX, mouseX);
@@ -328,9 +336,14 @@ if (canvas) {
             const boxH = Math.abs(mouseY - drawStartY);
 
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            if (dragField.tool === 'coverup') {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.strokeStyle = '#dc3545';
+            } else {
+                ctx.fillStyle = 'rgba(74, 246, 38, 0.3)'; // Green for variables
+                ctx.strokeStyle = '#4af626';
+            }
             ctx.fillRect(boxX, boxY, boxW, boxH);
-            ctx.strokeStyle = '#dc3545';
             ctx.lineWidth = 2;
             ctx.strokeRect(boxX, boxY, boxW, boxH);
         }
@@ -339,14 +352,11 @@ if (canvas) {
     canvas.addEventListener('mouseup', async (e) => {
         if (e.button !== 0 || !pdfViewport) return;
         
-        const currentToolNode = document.querySelector('input[name="toolMode"]:checked');
-        const currentTool = currentToolNode ? currentToolNode.value : 'variable';
-        
         const rect = canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
-        if (dragField && dragField.type === 'drawing_coverup') {
+        if (dragField && dragField.type === 'drawing_new') {
             const pixelW = Math.abs(mouseX - drawStartX);
             const pixelH = Math.abs(mouseY - drawStartY);
             
@@ -357,19 +367,17 @@ if (canvas) {
                 const bottomPixelY = Math.max(drawStartY, mouseY); 
                 const pdfY = (pdfViewport.height - bottomPixelY) / pdfViewport.scale;
 
-                templateMap.coverUps.push({ x: pdfX, y: pdfY, width: pdfW, height: pdfH });
+                if (dragField.tool === 'coverup') {
+                    templateMap.coverUps.push({ x: pdfX, y: pdfY, width: pdfW, height: pdfH });
+                } else if (dragField.tool === 'variable') {
+                    const variableName = await openVariableModal();
+                    if (variableName) {
+                        // SAVE THE WIDTH AND HEIGHT!
+                        templateMap.fields[variableName] = { x: pdfX, y: pdfY, width: pdfW, height: pdfH };
+                    }
+                }
             }
             redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
-        } 
-        else if (!dragField && currentTool === 'variable' && !hasMoved) {
-            const variableName = await openVariableModal();
-            
-            if (variableName) {
-                const pdfX = mouseX / pdfViewport.scale;
-                const pdfY = (pdfViewport.height - mouseY) / pdfViewport.scale;
-                templateMap.fields[variableName] = { x: pdfX, y: pdfY, size: 12 };
-                redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
-            }
         }
         
         isDragging = false;
