@@ -95,9 +95,8 @@
         </div>
     </div>
 
-    <!-- VIEW 4: Waiver Processor Tool -->
-   <!-- VIEW: Master Waiver Dashboard -->
-    <div id="waiverDashboardView" class="view-section hub-section">
+    <!-- VIEW: Master Waiver Dashboard -->
+    <div id="waiverDashboardView" class="view-section hub-section" style="max-width: 100%; padding: 20px;">
         
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <div>
@@ -118,6 +117,18 @@
                 <input type="text" id="dashboardSearch" placeholder="Type an ID or name..." style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);">
             </div>
             
+            <div>
+                <label style="font-weight: bold; font-size: 0.85em; color: var(--text-muted); display: block; margin-bottom: 5px;">Status</label>
+                <select id="dashboardStatus" style="padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);">
+                    <option value="">All Statuses</option>
+                    <option value="ready">Ready</option>
+                    <option value="pending">Pending</option>
+                    <option value="sent">Sent</option>
+                    <option value="received">Received / Paid</option>
+                    <option value="held">Held (Approval/Rejected)</option>
+                </select>
+            </div>
+
             <div>
                 <label style="font-weight: bold; font-size: 0.85em; color: var(--text-muted); display: block; margin-bottom: 5px;">Month</label>
                 <select id="dashboardMonth" style="padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);">
@@ -141,7 +152,6 @@
                 <label style="font-weight: bold; font-size: 0.85em; color: var(--text-muted); display: block; margin-bottom: 5px;">Year</label>
                 <select id="dashboardYear" style="padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);">
                     <option value="">All Years</option>
-                    <!-- Filled dynamically by JS -->
                 </select>
             </div>
 
@@ -150,9 +160,10 @@
             </button>
         </div>
 
-        <!-- Data Table -->
-        <div style="overflow-x: auto; background: var(--surface-color); border-radius: 8px; border: 1px solid var(--border-color); box-shadow: var(--card-shadow);">
-            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9em;">
+        <!-- Data Table Wrapper -->
+        <!-- Added max-content and nowrap to force single line and full width -->
+        <div style="width: 100%; overflow-x: auto; background: var(--surface-color); border-radius: 8px; border: 1px solid var(--border-color); box-shadow: var(--card-shadow);">
+            <table style="width: 100%; min-width: max-content; white-space: nowrap; border-collapse: collapse; text-align: left; font-size: 0.9em;">
                 <thead style="background: var(--bg-color); border-bottom: 2px solid var(--border-color);">
                     <tr>
                         <th style="padding: 15px; color: var(--text-muted);">Key (ID)</th>
@@ -160,8 +171,8 @@
                         <th style="padding: 15px; color: var(--text-muted);">Vendor</th>
                         <th style="padding: 15px; color: var(--text-muted);">Waiver Month</th>
                         <th style="padding: 15px; color: var(--text-muted);">Status</th>
-                        <th style="padding: 15px; color: var(--text-muted);">Sent</th>
-                        <th style="padding: 15px; color: var(--text-muted);">Returned</th>
+                        <th style="padding: 15px; color: var(--text-muted);">Sent Date</th>
+                        <th style="padding: 15px; color: var(--text-muted);">Received Date</th>
                         <th style="padding: 15px; color: var(--text-muted);">Action Date</th>
                         <th style="padding: 15px; color: var(--text-muted); text-align: center;">Notes</th>
                     </tr>
@@ -172,7 +183,7 @@
             </table>
         </div>
     </div>
-
+    
     <!-- Read Notes Modal -->
     <dialog id="readNotesModal" style="padding: 25px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--surface-color); width: 450px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
         <h3 style="margin-top: 0; color: var(--text-main); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">Waiver Notes</h3>
