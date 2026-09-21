@@ -142,3 +142,15 @@ ${htmlBody}
         return false;
     }
 }
+
+function getEmailSignature() {
+    const activeUser = window.Workspace.currentUser || "AR Team";
+    
+    return `
+        <br>
+        <div style="font-family: Calibri, sans-serif; font-size: 11pt; color: #333;">
+            <p style="margin: 0; font-weight: bold; color: #0056b3;">${activeUser}</p>
+            <p style="margin: 0;"><strong>Lithko Contracting LLC</strong></p>
+        </div>
+    `;
+}
