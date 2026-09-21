@@ -223,6 +223,10 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
         
         await loadDataset(); 
         
+        // NEW: Run the sweep!
+        subtitle.textContent = "Running status sweep... 🧹";
+        await refreshWaiverStatuses(); 
+        
         subtitle.textContent = "All data loaded. Select a tool to begin.";
     } catch (error) {
         alert(error.message);
