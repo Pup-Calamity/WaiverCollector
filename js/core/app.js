@@ -53,8 +53,15 @@ window.WORKSPACE_FILE_PATHS = {
 
 // --- UI Navigation Helpers ---
 function switchView(viewId) {
+    const targetView = document.getElementById(viewId);
+    
+    if (!targetView) {
+        console.error(`❌ switchView Error: Could not find HTML element with id="${viewId}"`);
+        return; 
+    }
+
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-    document.getElementById(viewId).classList.add('active');
+    targetView.classList.add('active');
 }
 
 function applyTheme(themeStr) {
