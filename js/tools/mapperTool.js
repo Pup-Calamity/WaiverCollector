@@ -1,4 +1,54 @@
 // js/tools/mapperTool.js
+
+const availableVariables = [
+    // Entities
+    { id: "subcontractor", label: "Vendor Name" },
+    { id: "subcontractorAddress", label: "Vendor Address" },
+    { id: "OUName", label: "Lithko LLC Entity Name" },
+    { id: "owner", label: "Project Owner" },
+    { id: "GCName", label: "General Contractor Name" },
+    
+    // Project Info
+    { id: "project", label: "Job Name" },
+    { id: "projNum", label: "Job ID Number" },
+    { id: "projectAddress", label: "Full Project Address (City, State, Zip)" },
+    { id: "addressOnly", label: "Street Address Only" },
+    { id: "county", label: "Project County" },
+    { id: "SubcontractScope", label: "Scope of Work" },
+    { id: "ContractDate", label: "Date of Contract" },
+    { id: "GCNumber", label: "GC Contract Number" },
+
+    // Amounts
+    { id: "amount", label: "Current Payment Amount ($)" },
+    { id: "amountWords", label: "Current Payment (Spelled Out)" },
+    { id: "previousperiod", label: "Previous Period Amount ($)" },
+    { id: "previousperiodWords", label: "Previous Period (Spelled Out)" },
+    { id: "ContractPaid", label: "Total Paid Before This Waiver ($)" },
+    { id: "conPaidWords", label: "Total Paid Before This (Spelled Out)" },
+    { id: "Cumulative", label: "Cumulative Paid Including This Waiver ($)" },
+    { id: "CumulativeWords", label: "Cumulative Paid (Spelled Out)" },
+    { id: "paidAmount", label: "Cleared Paid Amount ($)" },
+    { id: "unpaidAmount", label: "Pending Unpaid Amount ($)" },
+    { id: "contractAmount", label: "Base Contract Amount ($)" },
+    { id: "remainingBalance", label: "Remaining Balance on Contract ($)" },
+
+    // Dates
+    { id: "startdate", label: "Period Start Date" },
+    { id: "throughDate", label: "Period Through Date" },
+    { id: "paidThruDate", label: "Paid Through Date (Day before start)" },
+    { id: "dueDate", label: "Waiver Due Date" },
+    { id: "day", label: "Through Date - Day Only" },
+    { id: "month", label: "Through Date - Month Name Only" },
+    { id: "year", label: "Through Date - Year Only" },
+    
+    // Lists & Misc
+    { id: "invoices", label: "Current Period Invoices List" },
+    { id: "PrevInvoices", label: "Previous Period Invoices List" },
+    { id: "exceptions", label: "Contract Exceptions" },
+    { id: "barcode", label: "Barcode String" }
+];
+
+
 import { getPdfJsLib, redrawCanvas, getHoveredItem } from './templateEditor.js';
 
 let pdfViewport = null;
@@ -11,8 +61,6 @@ let dragField = null;
 let hasMoved = false;
 let drawStartX = 0;
 let drawStartY = 0;
-
-let availableVariables = ["vendorName", "amount", "projectName", "contractDate"]; 
 
 const output = document.getElementById('output');
 const templateDropdown = document.getElementById('templateDropdown');
