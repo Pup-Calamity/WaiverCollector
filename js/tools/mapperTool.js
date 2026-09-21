@@ -4,7 +4,7 @@ const availableVariables = [
     // Entities
     { id: "subcontractor", label: "Vendor Name" },
     { id: "subcontractorAddress", label: "Vendor Address" },
-    { id: "OUName", label: "Lithko LLC Entity Name" },
+    { id: "OUName", label: "Vendor's Contractor Name" },
     { id: "owner", label: "Project Owner" },
     { id: "GCName", label: "General Contractor Name" },
     
@@ -13,8 +13,12 @@ const availableVariables = [
     { id: "projNum", label: "Job ID Number" },
     { id: "projectAddress", label: "Full Project Address (City, State, Zip)" },
     { id: "addressOnly", label: "Street Address Only" },
+    { id: "city", label: "Project City" },
+    { id: "state", label: "Project State" },
+    { id: "zip", label: "Project Zip" },
     { id: "county", label: "Project County" },
     { id: "SubcontractScope", label: "Scope of Work" },
+    { id: "vendorContract", label: "Vendor Contract Date" },
     { id: "ContractDate", label: "Date of Contract" },
     { id: "GCNumber", label: "GC Contract Number" },
 
