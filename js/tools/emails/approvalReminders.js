@@ -1,7 +1,7 @@
-// js/tools/emails/approvalReminders.js
+// js/tools/emails/queueReminders.js
 
-// --- Report: Approval Reminders (Grouped by Job) ---
-async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
+// --- Universal Report: Queue Reminders (Approval & Rejected) ---
+async function batchProcessQueueReminders(targetMonth, targetYear, logMsg, queueType = "APPROVAL") {
     const waivers = window.Workspace.appData.waivers;
     const invInProcessing = window.Workspace.appData.invInProcessing;
     const jobInfo = window.Workspace.appData.jobInfo;
@@ -11,7 +11,7 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
         logMsg("❌ Missing required data! Please hit 'Sync Data'.", true);
         return;
     }
- 
+
     const emailFolderHandle = await window.Workspace.dirHandle.getDirectoryHandle("Generated_Emails", { create: true });
     
     const targetWaivers = waivers.filter(w => {
@@ -25,7 +25,7 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
         return (rowMonth === filterMonth) && (rowYear === filterYear);
     });
     
-    logMsg(`🔍 Found ${targetWaivers.length} waivers for ${targetMonth}/${targetYear}. Scanning for stuck invoices...`);
+    logMsg(`🔍 Found ${targetWaivers.length} waivers for ${targetMonth}/${targetYear}. Scanning ${queueType} queue...`);
     if (targetWaivers.length === 0) return;
 
     const uniqueJobs = [...new Set(targetWaivers.map(w => String(w["Job ID"] || '').trim().toLowerCase()))].filter(Boolean);
@@ -42,7 +42,11 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
             const invVendor = String(inv["vendorid"] || '').trim().toLowerCase();
             const invQueue = String(inv["Queue"] || '').trim().toLowerCase();
             
-            return (invJob === jobId && vendorIds.includes(invVendor) && invQueue.includes("approval")); 
+            if (queueType === "REJECTED") {
+                return (invJob === jobId && vendorIds.includes(invVendor) && invQueue.includes("reject")); 
+            } else {
+                return (invJob === jobId && vendorIds.includes(invVendor) && invQueue.includes("approval")); 
+            }
         });
 
         if (matchingInvoices.length > 0) {
@@ -55,8 +59,16 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
 
             const pcEmail = await getEmployeeEmail(pcName, logMsg);
             const omEmail = await getEmployeeEmail(omName, logMsg);
+            
+            // To: PC & OM
             const toEmail = [pcEmail, omEmail].filter(Boolean).join("; ");
-            const ccEmail = getBurgEmail(burgName, "Billing Coordinator");
+            
+            // CC: Billing Coordinator (plus AP Inbox if Rejected)
+            let ccList = [];
+            const bcEmail = getBurgEmail(burgName, "Billing Coordinator");
+            if (bcEmail) ccList.push(bcEmail);
+            if (queueType === "REJECTED") toEmail.push("AP@lithko.com");
+            const ccEmail = ccList.join("; ");
 
             const jobAR = openAR.filter(ar => String(ar["Job Number"]).trim().toLowerCase() === jobId);
             let amountOpen = 0;
@@ -86,6 +98,15 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
                     </tr>`;
             });
 
+            const queueDisplayName = queueType === "REJECTED" ? "Rejected" : "Approval";
+            
+            let specificInstructions = "";
+            if (queueType === "REJECTED") {
+                specificInstructions = "<li>These invoices have been <strong>Rejected</strong>. Please review the rejection notes in OnBase, correct the issues, and re-route them so they can be paid.</li>";
+            } else {
+                specificInstructions = "<li>Also note that invoices need to be approved by end of day the day before the payment day of your burg. If you are approving invoices on this list, please <strong>Reply ALL</strong> to this email to ensure they can get selected.</li>";
+            }
+
             const htmlBody = `
                 <div style="font-family: Calibri, sans-serif; font-size: 11pt; color: #333;">
                     <p><span style="background-color: #dcfce7; padding: 3px;"><strong>NOTE:</strong> This notification DOES NOT indicate whether your project has been funded, or that the vendor is refusing to sign a waiver. This is to be used as a tool to draw awareness to potential issues that may hold up our payment.</span></p>
@@ -94,7 +115,7 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
                     <p style="color: #b91c1c;"><strong>If this is more than 30 days old, it is very important to resolve the issues as quickly as possible.</strong></p>
                     <ul style="margin-bottom: 20px;">
                         <li>If you do not believe the issue can be resolved soon, but you feel you can have the vendor sign a waiver without the invoices being resolved, please respond to this email letting us know and we can CC you on the email when the waiver is sent.</li>
-                        <li>Also note that invoices need to be approved by end of day the day before the payment day of your burg. If you are approving invoices on this list, please <strong>Reply ALL</strong> to this email to ensure they can get selected.</li>
+                        ${specificInstructions}
                     </ul>
                     <table style="border-collapse: collapse; width: 100%; margin: 15px 0; font-size: 10pt;">
                         <thead>
@@ -112,12 +133,13 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
                         <tbody>${invoiceRowsHtml}</tbody>
                     </table>
                     <p>Thank you,</p>
-                    <p>AR Team</p>
                 </div>
+                ${getEmailSignature()}
             `;
 
-            const fileName = `ApprovalReminder_${displayJobId}`; 
-            const subject = `NOTIFICATION: Potential Payment Delay for ${displayJobId} - ${jobName}`;
+            const fileName = `${queueDisplayName}Reminder_${displayJobId}`; 
+            const subject = `NOTIFICATION: Potential Payment Delay [${queueDisplayName} Queue] for ${displayJobId} - ${jobName}`;
+            
             const success = await generateEmailFile(emailFolderHandle, fileName, toEmail, ccEmail, subject, htmlBody);
             
             if (success) {
@@ -127,5 +149,5 @@ async function batchProcessApprovalReminders(targetMonth, targetYear, logMsg) {
         }
     }
 
-    logMsg(`✅ Batch Complete! Generated ${emailCount} Approval Reminders.`);
+    logMsg(`✅ Batch Complete! Generated ${emailCount} ${queueType === "REJECTED" ? "Rejected" : "Approval"} Reminders.`);
 }
