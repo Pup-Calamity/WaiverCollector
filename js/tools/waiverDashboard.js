@@ -179,7 +179,9 @@ window.renderWaiverTable = function() {
         }
 
         // 2. FILTER: Month & Year
-        if (monthVal && String(row["Month"]).trim() !== monthVal) continue;
+        // Use parseInt to ensure "09" matches "9" safely
+        if (monthVal && parseInt(row["Month"]) !== parseInt(monthVal)) continue;
+        
         if (yearVal && String(row["Year"]).trim() !== yearVal) continue;
 
         // 3. FILTER: Search Bar 
