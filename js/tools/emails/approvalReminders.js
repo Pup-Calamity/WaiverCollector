@@ -1,4 +1,3 @@
-BANANA_HAMMOCK;
 // js/tools/emails/approvalReminders.js
 
 // --- Report: Approval Reminders (Grouped by Job) ---
