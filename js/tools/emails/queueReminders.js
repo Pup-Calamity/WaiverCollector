@@ -67,7 +67,7 @@ async function batchProcessQueueReminders(targetMonth, targetYear, logMsg, queue
             let ccList = [];
             const bcEmail = getBurgEmail(burgName, "Billing Coordinator");
             if (bcEmail) ccList.push(bcEmail);
-            if (queueType === "REJECTED") toEmail.push("AP@lithko.com");
+            if (queueType === "REJECTED") ccList.push("AP@lithko.com");
             const ccEmail = ccList.join("; ");
 
             const jobAR = openAR.filter(ar => String(ar["Job Number"]).trim().toLowerCase() === jobId);
