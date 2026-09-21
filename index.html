@@ -166,6 +166,11 @@
             <table style="width: 100%; min-width: max-content; white-space: nowrap; border-collapse: collapse; text-align: left; font-size: 0.9em;">
                 <thead style="background: var(--bg-color); border-bottom: 2px solid var(--border-color);">
                     <tr>
+                        <!-- NEW CHECKBOX COLUMN -->
+                        <th style="padding: 15px; width: 40px; text-align: center;">
+                            <input type="checkbox" id="selectAllWaivers" style="transform: scale(1.2); cursor: pointer;">
+                        </th>
+                        
                         <th style="padding: 15px; color: var(--text-muted);">Key (ID)</th>
                         <th style="padding: 15px; color: var(--text-muted);">Job</th>
                         <th style="padding: 15px; color: var(--text-muted);">Vendor</th>
@@ -190,6 +195,33 @@
         <p id="notesModalContent" style="white-space: pre-wrap; color: var(--text-main); font-size: 14px; min-height: 80px; padding: 15px; background: var(--bg-color); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 20px;"></p>
         <div style="display: flex; justify-content: flex-end;">
             <button id="closeNotesModalBtn" class="primary-btn" style="width: auto; background: #6c757d;">Close</button>
+        </div>
+    </dialog>
+
+    <!-- Batch Processing Settings Modal -->
+    <dialog id="batchSettingsModal" style="padding: 25px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--surface-color); width: 450px; box-shadow: var(--card-shadow);">
+        <h3 style="margin-top: 0; color: var(--text-main); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">Batch Processing Settings</h3>
+        <p style="font-size: 0.95em; color: var(--text-muted); margin-bottom: 20px;">You selected <strong id="batchSelectedCount" style="color: var(--brand-color); font-size: 1.2em;">0</strong> waivers to process.</p>
+        
+        <div style="margin-bottom: 15px; background: var(--bg-color); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-main); font-weight: bold;">
+                <input type="checkbox" id="batchIsFinal" style="transform: scale(1.2);"> 
+                Generate as FINAL Waivers
+            </label>
+            <p style="margin: 5px 0 0 25px; font-size: 0.85em; color: var(--text-muted);">Check this if these are final payments. Otherwise, conditional/unconditional templates will be used based on current retention balances.</p>
+        </div>
+
+        <div style="margin-bottom: 25px; background: var(--bg-color); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-main); font-weight: bold;">
+                <input type="checkbox" id="batchIsManual" style="transform: scale(1.2);"> 
+                Prompt for Manual Amounts
+            </label>
+            <p style="margin: 5px 0 0 25px; font-size: 0.85em; color: var(--text-muted);">Check this to pause generation and manually override the calculated amounts for each vendor.</p>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button id="cancelBatchBtn" class="primary-btn" style="width: auto; background: transparent; color: var(--text-main); border: 1px solid var(--border-color);">Cancel</button>
+            <button id="confirmBatchBtn" class="primary-btn" style="width: auto; background: #10b981;">🚀 Start Generation Engine</button>
         </div>
     </dialog>
 
