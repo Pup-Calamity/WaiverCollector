@@ -42,7 +42,7 @@ window.addEventListener('DOMContentLoaded', () => {
             }
 
             // Now that data is loaded (or was already there), switch the view
-            switchView('waiverToolView');
+            switchView('waiverDashboardView');
             populateMonthDropdown(); 
             renderWaiverTable();     
         });
