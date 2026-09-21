@@ -55,6 +55,9 @@ const availableVariables = [
 import { getPdfJsLib, redrawCanvas, getHoveredItem } from './templateEditor.js';
 
 let pdfViewport = null;
+let pdfDocument = null; // NEW: Holds the full PDF object in memory
+let currentPageNum = 1; // NEW
+let totalPages = 1;     // NEW
 let templateMap = { fields: {}, coverUps: [] };
 let currentPdfName = "Template"; 
 let currentPdfBytes = null; // NEW: Stores the raw PDF to save later
@@ -125,7 +128,47 @@ async function refreshTemplateList() {
     }
 }
 
-// --- PDF Loading ---
+// --- PDF Loading & Page Navigation ---
+async function renderPdfPage(pageNum) {
+    const page = await pdfDocument.getPage(pageNum);
+    pdfViewport = page.getViewport({ scale: 1.5 });
+    
+    const canvas = document.getElementById('pdfCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = pdfViewport.width;
+    canvas.height = pdfViewport.height;
+
+    await page.render({ canvasContext: ctx, viewport: pdfViewport }).promise;
+    
+    offscreenCanvas = document.createElement('canvas');
+    offscreenCanvas.width = canvas.width;
+    offscreenCanvas.height = canvas.height;
+    offscreenCanvas.getContext('2d').drawImage(canvas, 0, 0);
+
+    // Update UI
+    document.getElementById('pageIndicator').textContent = `Page ${pageNum} of ${totalPages}`;
+    document.getElementById('prevPageBtn').disabled = pageNum <= 1;
+    document.getElementById('nextPageBtn').disabled = pageNum >= totalPages;
+
+    selectedField = null;
+    updateSelectionUI();
+    redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap, selectedField, currentPageNum);
+}
+
+document.getElementById('prevPageBtn')?.addEventListener('click', async () => {
+    if (currentPageNum > 1) {
+        currentPageNum--;
+        await renderPdfPage(currentPageNum);
+    }
+});
+
+document.getElementById('nextPageBtn')?.addEventListener('click', async () => {
+    if (currentPageNum < totalPages) {
+        currentPageNum++;
+        await renderPdfPage(currentPageNum);
+    }
+});
+
 document.getElementById('loadPdfBtn').addEventListener('click', async () => {
     try {
         const pdfjsLib = getPdfJsLib();
@@ -134,23 +177,11 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
         currentPdfName = file.name;
         
         const arrayBuffer = await file.arrayBuffer();
-        currentPdfBytes = arrayBuffer; // NEW: Store bytes for the Save button
+        currentPdfBytes = arrayBuffer; 
         
-        const pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
-        const page = await pdfDoc.getPage(1);
-        
-        pdfViewport = page.getViewport({ scale: 1.5 });
-        const canvas = document.getElementById('pdfCanvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = pdfViewport.width;
-        canvas.height = pdfViewport.height;
-
-        await page.render({ canvasContext: ctx, viewport: pdfViewport }).promise;
-        
-        offscreenCanvas = document.createElement('canvas');
-        offscreenCanvas.width = canvas.width;
-        offscreenCanvas.height = canvas.height;
-        offscreenCanvas.getContext('2d').drawImage(canvas, 0, 0);
+        pdfDocument = await pdfjsLib.getDocument(arrayBuffer).promise;
+        totalPages = pdfDocument.numPages;
+        currentPageNum = 1; // Reset to page 1
 
         document.getElementById('saveMapBtn').disabled = false;
 
@@ -168,7 +199,7 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
             if (output) output.textContent = `Loaded ${currentPdfName}. No existing map found.`;
         }
         
-        redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap);
+        await renderPdfPage(currentPageNum);
         await refreshTemplateList(); 
         
     } catch (error) { 
@@ -457,12 +488,14 @@ if (canvas) {
                 const pdfY = (pdfViewport.height - bottomPixelY) / pdfViewport.scale;
 
                 if (dragField.tool === 'coverup') {
-                    templateMap.coverUps.push({ x: pdfX, y: pdfY, width: pdfW, height: pdfH });
+                    // Inject the page!
+                    templateMap.coverUps.push({ x: pdfX, y: pdfY, width: pdfW, height: pdfH, page: currentPageNum });
                     selectedField = { type: 'coverup', id: templateMap.coverUps.length - 1 };
                 } else if (dragField.tool === 'variable') {
                     const variableName = await openVariableModal();
                     if (variableName) {
-                        templateMap.fields[variableName] = { x: pdfX, y: pdfY, width: pdfW, height: pdfH };
+                        // Inject the page!
+                        templateMap.fields[variableName] = { x: pdfX, y: pdfY, width: pdfW, height: pdfH, page: currentPageNum };
                         selectedField = { type: 'variable', id: variableName };
                     }
                 }
