@@ -20,23 +20,34 @@ function generateWaiverKey(jobId, vendorId, month, year, typePrefix = "") {
 }
 
 function prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, customThroughPeriod, customDueDate, waiverType) {
-    const today = new Date().toDateString()
+    const xDate = new Date().toDateString()
     const typePrefix = waiverType === "Final" ? "F" : (waiverType === "Conditional" ? "C" : "U");
+
+    // Ensure calculateWaiverDates is globally available from helpers.js
+    let finalThroughPeriod = customThroughPeriod;
+    let finalDueDate = customDueDate;
+
+    if (typeof calculateWaiverDates === "function" && (!customThroughPeriod || !customDueDate)) {
+        const timing = calculateWaiverDates(targetMonth, targetYear, dueDayOffset, throughDay);
+        if (!customThroughPeriod) finalThroughPeriod = timing.throughPeriod;
+        if (!customDueDate) finalDueDate = timing.dueDate;
+    }
+    
     return {
         "Waiver ID": generateWaiverKey(jobId, vendorId, targetMonth, targetYear, typePrefix), 
         "Job ID": jobId,
         "Vendor ID": vendorId,
         "Month": targetMonth,
         "Year": targetYear,
-        "Waiver Month":         
-        "Through Period": customThroughPeriod || "", 
+        "Waiver Month" "",        
+        "Through Period": finalThroughPeriod || "", 
         "Status": "",
         "Sent Date": "", // Keeping the old one if your UI relies on it
-        "Due Date": customDueDate || "",    -
+        "Due Date": finalDueDate || "", 
         "Original Send Date": "",
         "Action Date": "",
         "Times Sent": 0,
-        "Last Updated": `${todayStr} ${today.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`,
+        "Last Updated": `${x} ${today.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`,
         "Updated By": currentUser,
         "Notes": ""
     };
