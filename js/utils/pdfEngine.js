@@ -1,6 +1,5 @@
 // js/utils/pdfEngine.js
 
-// By attaching to "window", it becomes globally available to waiverTool.js
 window.stampWaiverWithConfig = async function(pdfArrayBuffer, vendorData, configJson) {
     if (!window.PDFLib) throw new Error("PDF-lib is not loaded. Check index.html script tags.");
     
@@ -10,57 +9,56 @@ window.stampWaiverWithConfig = async function(pdfArrayBuffer, vendorData, config
     const pages = pdfDoc.getPages();
     const firstPage = pages[0]; 
 
-    // Load the font so we can mathematically measure text width/height
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
     // 1. Draw Cover-Ups
     if (configJson.coverUps) {
         configJson.coverUps.forEach(box => {
             const pageNum = box.page || 1;
-            const targetPage = pages[pageNum - 1] || firstPage; // Safely default to page 1
+            const targetPage = pages[pageNum - 1] || firstPage; 
             
             targetPage.drawRectangle({
                 x: box.x, y: box.y, width: box.width, height: box.height,
-                color: rgb(1, 1, 1) // Pure white
+                color: rgb(1, 1, 1) 
             });
         });
     }
 
     // 2. Stamp the new dynamic text on top
     if (configJson.fields) {
-        for (const [variableName, coords] of Object.entries(configJson.fields)) {
-            
-            const textToPrint = vendorData[variableName] !== undefined ? String(vendorData[variableName]) : "";
+        // BACKWARDS COMPATIBILITY: Convert old dictionary to new Array format
+        const fieldList = Array.isArray(configJson.fields) 
+            ? configJson.fields 
+            : Object.entries(configJson.fields).map(([k, v]) => ({ variable: k, ...v }));
+
+        for (const field of fieldList) {
+            const textToPrint = vendorData[field.variable] !== undefined ? String(vendorData[field.variable]) : "";
             
             if (textToPrint.trim() !== "") {
-                const isBarcode = (variableName === "barcode");
-                const pageNum = coords.page || 1;
-                const targetPage = pages[pageNum - 1] || firstPage; // Safely default to page 1
+                const isBarcode = (field.variable === "barcode");
+                const pageNum = field.page || 1;
+                const targetPage = pages[pageNum - 1] || firstPage; 
                 
-                // --- THE AUTO-SIZE MATH ENGINE ---
-                let finalFontSize = coords.size || 12; // Default fallback
+                let finalFontSize = field.size || 12; 
                 
-                // If the user drew a bounding box in the UI with a width & height
-                if (coords.width && coords.height && !isBarcode) {
-                    finalFontSize = coords.height; // Start font size as large as the box height
-                    
-                    // Keep shrinking the font until it fits both Width and Height bounds
+                if (field.width && field.height && !isBarcode) {
+                    finalFontSize = field.height; 
                     while (finalFontSize > 4) {
                         const textWidth = font.widthOfTextAtSize(textToPrint, finalFontSize);
                         const textHeight = font.heightAtSize(finalFontSize);
                         
-                        if (textWidth <= coords.width && textHeight <= coords.height) {
-                            break; // It fits!
+                        if (textWidth <= field.width && textHeight <= field.height) {
+                            break; 
                         }
-                        finalFontSize -= 0.5; // Shrink it and loop again
+                        finalFontSize -= 0.5; 
                     }
                 }
 
                 targetPage.drawText(textToPrint, {
-                    x: coords.x,
-                    y: coords.y,
+                    x: field.x,
+                    y: field.y,
                     size: finalFontSize,
-                    font: font, // MUST pass the font object to use precise sizing
+                    font: font, 
                     color: rgb(0, 0, 0),
                     rotate: isBarcode ? degrees(90) : degrees(0)
                 });
