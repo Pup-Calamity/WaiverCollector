@@ -34,11 +34,10 @@ function prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, customThroug
         "Sent Date": "", // Keeping the old one if your UI relies on it
         "Due Date": customDueDate || "",    -
         "Original Send Date": "",
-        "Last Contact Date": "",
         "Action Date": "",
         "Times Sent": 0,
-        "Last Updated": today,
-        "Updated By": "",
+        "Last Updated": `${todayStr} ${today.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`,
+        "Updated By": currentUser,
         "Notes": ""
     };
 }
@@ -358,13 +357,16 @@ window.batchProcessWaivers = async function(jobId, vendorList, targetMonth, targ
                     window.Workspace.appData.waivers.push(record); 
                 }
 
-                // --- NEW DATE MATH ---
+                // --- NEW DATE & AUDIT MATH ---
                 const today = new Date();
                 const todayStr = today.toLocaleDateString();
                 
-                // Action Date = Today + 3 Days (JS safely handles month rollovers automatically!)
+                // Action Date = Today + 3 Days
                 const actionDate = new Date();
                 actionDate.setDate(actionDate.getDate() + 3);
+                
+                // Grab the current logged-in user from your Workspace state, default to "System" if somehow empty
+                const currentUser = window.Workspace?.currentUser?.name || localStorage.getItem('currentUser') || "System";
                 
                 // 1. Immutable Original Send Date (Only set if it's currently blank)
                 if (!record["Original Send Date"] || String(record["Original Send Date"]).trim() === "") {
@@ -376,11 +378,12 @@ window.batchProcessWaivers = async function(jobId, vendorList, targetMonth, targ
                 if (isNaN(currentTimesSent)) currentTimesSent = 0;
                 record["Times Sent"] = currentTimesSent + 1;
 
-                // 3. Update standard dates and status
-                record["Last Contact Date"] = todayStr;
+                // 3. Update Audit Trail & Standard Fields
+                record["Last Updated"] = `${todayStr} ${today.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                record["Updated By"] = currentUser;
                 record["Action Date"] = actionDate.toLocaleDateString();
                 
-                record["Sent Date"] = todayStr; // Legacy column
+                record["Sent Date"] = todayStr; 
                 record["Status"] = "Sent";
                 record["Through Period"] = endingDay.toLocaleDateString();
                 record["Due Date"] = dueDate.toLocaleDateString();
@@ -389,6 +392,7 @@ window.batchProcessWaivers = async function(jobId, vendorList, targetMonth, targ
 
                 vendorEmailBody += `<p>• ${waiverType} Waiver for period ending ${endingDay.toLocaleDateString()}.</p>`;
                 successCount++;
+                
             } catch (error) {
                 logMsg(`Error processing ${waiverType} for ${vendorId}: ${error.message}`, true);
             }
