@@ -1,14 +1,11 @@
 // js/tools/mapperTool.js
 
 const availableVariables = [
-    // Entities
     { id: "subcontractor", label: "Vendor Name" },
     { id: "subcontractorAddress", label: "Vendor Address" },
     { id: "OUName", label: "Vendor's Contractor Name" },
     { id: "owner", label: "Project Owner" },
     { id: "GCName", label: "General Contractor Name" },
-    
-    // Project Info
     { id: "project", label: "Job Name" },
     { id: "projNum", label: "Job ID Number" },
     { id: "projectAddress", label: "Full Project Address (City, State, Zip)" },
@@ -21,8 +18,6 @@ const availableVariables = [
     { id: "vendorContract", label: "Vendor Contract Date" },
     { id: "ContractDate", label: "Date of Contract" },
     { id: "GCNumber", label: "GC Contract Number" },
-
-    // Amounts
     { id: "amount", label: "Current Payment Amount ($)" },
     { id: "amountWords", label: "Current Payment (Spelled Out)" },
     { id: "previousperiod", label: "Previous Period Amount ($)" },
@@ -35,8 +30,6 @@ const availableVariables = [
     { id: "unpaidAmount", label: "Pending Unpaid Amount ($)" },
     { id: "contractAmount", label: "Base Contract Amount ($)" },
     { id: "remainingBalance", label: "Remaining Balance on Contract ($)" },
-
-    // Dates
     { id: "startdate", label: "Period Start Date" },
     { id: "throughDate", label: "Period Through Date" },
     { id: "paidThruDate", label: "Paid Through Date (Day before start)" },
@@ -44,8 +37,6 @@ const availableVariables = [
     { id: "day", label: "Through Date - Day Only" },
     { id: "month", label: "Through Date - Month Name Only" },
     { id: "year", label: "Through Date - Year Only" },
-    
-    // Lists & Misc
     { id: "invoices", label: "Current Period Invoices List" },
     { id: "PrevInvoices", label: "Previous Period Invoices List" },
     { id: "exceptions", label: "Contract Exceptions" },
@@ -55,12 +46,13 @@ const availableVariables = [
 import { getPdfJsLib, redrawCanvas, getHoveredItem } from './templateEditor.js';
 
 let pdfViewport = null;
-let pdfDocument = null; // NEW: Holds the full PDF object in memory
-let currentPageNum = 1; // NEW
-let totalPages = 1;     // NEW
-let templateMap = { fields: {}, coverUps: [] };
+let pdfDocument = null; 
+let currentPageNum = 1; 
+let totalPages = 1;     
+// NOW DEFAULTS TO AN ARRAY FOR FIELDS!
+let templateMap = { fields: [], coverUps: [] };
 let currentPdfName = "Template"; 
-let currentPdfBytes = null; // NEW: Stores the raw PDF to save later
+let currentPdfBytes = null; 
 let offscreenCanvas = null;
 
 let isDragging = false;
@@ -75,7 +67,6 @@ const deleteTemplateBtn = document.getElementById('deleteTemplateBtn');
 
 // --- Initialization & UI Routing ---
 window.addEventListener('DOMContentLoaded', () => {
-    
     const launchBtn = document.getElementById('launchMapperBtn');
     if (launchBtn) {
         launchBtn.addEventListener('click', async () => {
@@ -83,10 +74,8 @@ window.addEventListener('DOMContentLoaded', () => {
                 alert("Please connect a Master AR Folder first.");
                 return;
             }
-            
             switchView('templateMapperView');
             await refreshTemplateList();
-            // REMOVED: loadVariablesList() - we no longer pull from the JSON file!
         });
     }
 
@@ -145,10 +134,14 @@ async function renderPdfPage(pageNum) {
     offscreenCanvas.height = canvas.height;
     offscreenCanvas.getContext('2d').drawImage(canvas, 0, 0);
 
-    // Update UI
-    document.getElementById('pageIndicator').textContent = `Page ${pageNum} of ${totalPages}`;
-    document.getElementById('prevPageBtn').disabled = pageNum <= 1;
-    document.getElementById('nextPageBtn').disabled = pageNum >= totalPages;
+    const ind = document.getElementById('pageIndicator');
+    if (ind) ind.textContent = `Page ${pageNum} of ${totalPages}`;
+    
+    const prev = document.getElementById('prevPageBtn');
+    if (prev) prev.disabled = pageNum <= 1;
+    
+    const next = document.getElementById('nextPageBtn');
+    if (next) next.disabled = pageNum >= totalPages;
 
     selectedField = null;
     updateSelectionUI();
@@ -181,7 +174,7 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
         
         pdfDocument = await pdfjsLib.getDocument(arrayBuffer).promise;
         totalPages = pdfDocument.numPages;
-        currentPageNum = 1; // Reset to page 1
+        currentPageNum = 1; 
 
         document.getElementById('saveMapBtn').disabled = false;
 
@@ -191,11 +184,21 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
             const configFile = await (await templatesDir.getFileHandle(configName)).getFile();
             templateMap = JSON.parse(await configFile.text());
             
-            if (!templateMap.fields) templateMap.fields = {};
+            // CONVERT OLD DICTIONARIES TO NEW ARRAY FORMAT
+            if (!templateMap.fields) {
+                templateMap.fields = [];
+            } else if (!Array.isArray(templateMap.fields)) {
+                const convertedArray = [];
+                for (const [key, val] of Object.entries(templateMap.fields)) {
+                    convertedArray.push({ variable: key, ...val });
+                }
+                templateMap.fields = convertedArray;
+            }
             if (!templateMap.coverUps) templateMap.coverUps = [];
+            
             if (output) output.textContent = `Loaded existing map for ${currentPdfName}.`;
         } catch (err) {
-            templateMap = { fields: {}, coverUps: [] };
+            templateMap = { fields: [], coverUps: [] };
             if (output) output.textContent = `Loaded ${currentPdfName}. No existing map found.`;
         }
         
@@ -212,14 +215,12 @@ document.getElementById('saveMapBtn').addEventListener('click', async () => {
     try {
         const templatesDir = await window.Workspace.dirHandle.getDirectoryHandle('Templates', { create: true });
         
-        // 1. Save the JSON Config Map
         const configName = currentPdfName.replace('.pdf', '_Config.json');
         const configHandle = await templatesDir.getFileHandle(configName, { create: true });
         const configWritable = await configHandle.createWritable();
         await configWritable.write(JSON.stringify(templateMap, null, 2));
         await configWritable.close();
 
-        // 2. NEW: Save a physical copy of the PDF into the Templates folder!
         if (currentPdfBytes) {
             const pdfHandle = await templatesDir.getFileHandle(currentPdfName, { create: true });
             const pdfWritable = await pdfHandle.createWritable();
@@ -243,21 +244,16 @@ if (deleteTemplateBtn) {
         if (confirm(`Delete ${selectedPdf} and its mapping configuration?`)) {
             try {
                 const templatesDir = await window.Workspace.dirHandle.getDirectoryHandle('Templates');
-                
-                // Delete JSON
                 const configName = selectedPdf.replace('.pdf', '_Config.json');
-                await templatesDir.removeEntry(configName).catch(e => console.log("No json to delete"));
-                
-                // Delete PDF
-                await templatesDir.removeEntry(selectedPdf).catch(e => console.log("No pdf to delete"));
+                await templatesDir.removeEntry(configName).catch(()=>console.log("No json"));
+                await templatesDir.removeEntry(selectedPdf).catch(()=>console.log("No pdf"));
                 
                 if (output) output.textContent = `🗑️ Deleted ${selectedPdf}.`;
                 
-                // Clear Canvas
                 const canvas = document.getElementById('pdfCanvas');
                 const ctx = canvas.getContext('2d');
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                templateMap = { fields: {}, coverUps: [] };
+                templateMap = { fields: [], coverUps: [] };
                 
                 await refreshTemplateList();
             } catch (error) { 
@@ -276,9 +272,7 @@ function openVariableModal() {
         const cancelBtn = document.getElementById('cancelVariableBtn');
 
         select.innerHTML = availableVariables.map(v => {
-            if (typeof v === 'string') {
-                return `<option value="${v}">${v}</option>`;
-            }
+            if (typeof v === 'string') return `<option value="${v}">${v}</option>`;
             return `<option value="${v.id}">${v.label}</option>`;
         }).join('');
         
@@ -310,8 +304,6 @@ let initialWidth = 0;
 let initialHeight = 0;
 let initialY = 0; 
 
-// --- NEW: CSS-to-Canvas Scaler ---
-// This ensures the mouse aligns perfectly even if the canvas is shrunk by CSS
 function getMousePos(canvas, evt) {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;   
@@ -331,17 +323,19 @@ function updateSelectionUI() {
         nameLabel.textContent = "Nothing selected. Click a box on the canvas.";
         delBtn.disabled = true;
     } else {
-        const name = selectedField.type === 'variable' ? `Variable: [ ${selectedField.id} ]` : `Whiteout Box #${selectedField.id + 1}`;
+        const name = selectedField.type === 'variable' 
+            ? `Variable: [ ${templateMap.fields[selectedField.id].variable} ]` 
+            : `Whiteout Box #${selectedField.id + 1}`;
         nameLabel.innerHTML = `<strong style="color: var(--brand-color);">${name}</strong><br>Drag the center to move. Drag the bottom-right handle to resize.`;
         delBtn.disabled = false;
     }
 }
 
-// Bind Delete Button in UI
+// Bind Delete Button in UI (uses splice for arrays!)
 document.getElementById('deleteSelectionBtn')?.addEventListener('click', () => {
     if (!selectedField) return;
     if (selectedField.type === 'variable') {
-        delete templateMap.fields[selectedField.id];
+        templateMap.fields.splice(selectedField.id, 1);
     } else {
         templateMap.coverUps.splice(selectedField.id, 1);
     }
@@ -359,11 +353,11 @@ if (canvas) {
         const target = getHoveredItem(mouseX, mouseY, pdfViewport, templateMap, currentPageNum);
         
         if (target && confirm(`Delete this item?`)) {
-            if (target.type === 'variable') delete templateMap.fields[target.id];
+            if (target.type === 'variable') templateMap.fields.splice(target.id, 1);
             else templateMap.coverUps.splice(target.id, 1);
             selectedField = null;
             updateSelectionUI();
-            redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap, selectedField);
+            redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap, selectedField, currentPageNum);
         }
     });
 
@@ -488,15 +482,14 @@ if (canvas) {
                 const pdfY = (pdfViewport.height - bottomPixelY) / pdfViewport.scale;
 
                 if (dragField.tool === 'coverup') {
-                    // Inject the page!
                     templateMap.coverUps.push({ x: pdfX, y: pdfY, width: pdfW, height: pdfH, page: currentPageNum });
                     selectedField = { type: 'coverup', id: templateMap.coverUps.length - 1 };
                 } else if (dragField.tool === 'variable') {
                     const variableName = await openVariableModal();
                     if (variableName) {
-                        // Inject the page!
-                        templateMap.fields[variableName] = { x: pdfX, y: pdfY, width: pdfW, height: pdfH, page: currentPageNum };
-                        selectedField = { type: 'variable', id: variableName };
+                        // PUSHES TO THE ARRAY SO IT CAN BE USED INFINITELY!
+                        templateMap.fields.push({ variable: variableName, x: pdfX, y: pdfY, width: pdfW, height: pdfH, page: currentPageNum });
+                        selectedField = { type: 'variable', id: templateMap.fields.length - 1 };
                     }
                 }
             }
