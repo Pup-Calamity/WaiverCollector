@@ -19,18 +19,27 @@ function generateWaiverKey(jobId, vendorId, month, year, typePrefix = "") {
     return `${baseKey}-${nextNumber}`;
 }
 
-// --- Data Preparation Engine ---
 function prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, customThroughPeriod, customDueDate, waiverType) {
-    const typePrefix = waiverType.includes("Unconditional") ? "U" : "C";
+    const today = new Date().toDateString()
+    const typePrefix = waiverType === "Final" ? "F" : (waiverType === "Conditional" ? "C" : "U");
     return {
         "Waiver ID": generateWaiverKey(jobId, vendorId, targetMonth, targetYear, typePrefix), 
         "Job ID": jobId,
         "Vendor ID": vendorId,
         "Month": targetMonth,
         "Year": targetYear,
-        "Due Date": customDueDate || "",              
+        "Waiver Month":         
         "Through Period": customThroughPeriod || "", 
-        "Status": "Pending"
+        "Status": "",
+        "Sent Date": "", // Keeping the old one if your UI relies on it
+        "Due Date": customDueDate || "",    -
+        "Original Send Date": "",
+        "Last Contact Date": "",
+        "Action Date": "",
+        "Times Sent": 0,
+        "Last Updated": today,
+        "Updated By": "",
+        "Notes": ""
     };
 }
 // --- Helper: Find Existing Waiver ---
@@ -342,14 +351,36 @@ window.batchProcessWaivers = async function(jobId, vendorList, targetMonth, targ
 
                 generatedPdfHandles.push(outPdfHandle); 
 
-                // UPDATE MEMORY (Do not push blindly)
+              // UPDATE MEMORY (Do not push blindly)
                 let record = findExistingWaiver(jobId, vendorId, targetMonth, targetYear, waiverType);
                 if (!record) {
                     record = prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, endingDay.toLocaleDateString(), dueDate.toLocaleDateString(), waiverType);
                     window.Workspace.appData.waivers.push(record); 
                 }
 
-                record["Sent Date"] = new Date().toLocaleDateString();
+                // --- NEW DATE MATH ---
+                const today = new Date();
+                const todayStr = today.toLocaleDateString();
+                
+                // Action Date = Today + 3 Days (JS safely handles month rollovers automatically!)
+                const actionDate = new Date();
+                actionDate.setDate(actionDate.getDate() + 3);
+                
+                // 1. Immutable Original Send Date (Only set if it's currently blank)
+                if (!record["Original Send Date"] || String(record["Original Send Date"]).trim() === "") {
+                    record["Original Send Date"] = todayStr;
+                }
+
+                // 2. Increment Times Sent
+                let currentTimesSent = parseInt(record["Times Sent"]);
+                if (isNaN(currentTimesSent)) currentTimesSent = 0;
+                record["Times Sent"] = currentTimesSent + 1;
+
+                // 3. Update standard dates and status
+                record["Last Contact Date"] = todayStr;
+                record["Action Date"] = actionDate.toLocaleDateString();
+                
+                record["Sent Date"] = todayStr; // Legacy column
                 record["Status"] = "Sent";
                 record["Through Period"] = endingDay.toLocaleDateString();
                 record["Due Date"] = dueDate.toLocaleDateString();
@@ -358,7 +389,6 @@ window.batchProcessWaivers = async function(jobId, vendorList, targetMonth, targ
 
                 vendorEmailBody += `<p>• ${waiverType} Waiver for period ending ${endingDay.toLocaleDateString()}.</p>`;
                 successCount++;
-
             } catch (error) {
                 logMsg(`Error processing ${waiverType} for ${vendorId}: ${error.message}`, true);
             }
