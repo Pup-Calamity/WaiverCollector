@@ -67,13 +67,15 @@ async function validateWaiverRun(targetMonth, targetYear, vendorList, jobId, isF
 
     const condRule = String(jobSettings["Conditional"] || "").trim();
     const uncondRule = String(jobSettings["Unconditional"] || "").trim();
-    const throughDayStr = jobSettings["Through Day"];
+
+    // Open the local Templates folder to verify files actually exist
+    const templatesDir = await window.Workspace.dirHandle.getDirectoryHandle('Templates', { create: true });
 
     for (const vendorId of vendorList) {
         const vendor = String(vendorId).trim();
         const job = String(jobId).trim();
         
-        let requiredTemplates = []; // Array to hold 1 or 2 templates
+        let requiredTemplates = []; 
 
         if (isFinal) {
             const finalTemp = WaiverMath.getEmailInfo(job, vendor, "Final Template");
@@ -96,21 +98,28 @@ async function validateWaiverRun(targetMonth, targetYear, vendorList, jobId, isF
                 else requiredTemplates.push({ type: "Unconditional", name: uncondTemp, rule: uncondRule });
             }
             
-            if (requiredTemplates.length === 0) {
-                // If both are blank, it skips silently (no waiver needed based on Job Notes)
-                continue; 
-            }
+            if (requiredTemplates.length === 0) continue; 
         }
 
-        // Validate all required templates exist in the Master Template List
+        // Verify the PDF and the JSON map exist in the actual local Templates folder
         for (const req of requiredTemplates) {
-            const templateExists = appData.templateList.some(t => String(t["Template Name"] || '').trim().toLowerCase() === req.name.toLowerCase());
-            if (!templateExists) {
-                errorLog.push(`- ${vendor}: Template '${req.name}' not found in Master Template List.`);
+            let pdfExists = true;
+            let jsonExists = true;
+
+            try { await templatesDir.getFileHandle(`${req.name}.pdf`); } 
+            catch { pdfExists = false; }
+
+            try { await templatesDir.getFileHandle(`${req.name}_Config.json`); } 
+            catch { jsonExists = false; }
+
+            if (!pdfExists || !jsonExists) {
+                let missing = [];
+                if (!pdfExists) missing.push("PDF File");
+                if (!jsonExists) missing.push("Mapped JSON Config");
+                errorLog.push(`- ${vendor}: Missing ${missing.join(" and ")} for template '${req.name}' in the Templates folder.`);
             }
         }
 
-        // If no errors for this vendor, add them to the queue
         if (errorLog.filter(e => e.includes(vendor)).length === 0) {
             validVendors.push({ vendorId: vendor, templatesToRun: requiredTemplates });
         }
@@ -122,7 +131,6 @@ async function validateWaiverRun(targetMonth, targetYear, vendorList, jobId, isF
         validVendors: validVendors
     };
 }
-
 
 // --- Master Batch Processor ---
 window.batchProcessWaivers = async function(jobId, vendorList, targetMonth, targetYear, isFinal, isManualAmount) {
