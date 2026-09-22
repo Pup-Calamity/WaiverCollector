@@ -21,8 +21,8 @@ export function redrawCanvas(canvas, bgCanvas, viewport, map, selectedItem = nul
 
     if (map.coverUps) {
         map.coverUps.forEach((box, index) => {
-            const itemPage = box.page || 1; // Fallback to 1 for older templates
-            if (itemPage !== currentPageNum) return; // Skip if not on current page!
+            const itemPage = box.page || 1; 
+            if (itemPage !== currentPageNum) return; 
 
             const px = box.x * viewport.scale;
             const ph = box.height * viewport.scale;
@@ -34,22 +34,22 @@ export function redrawCanvas(canvas, bgCanvas, viewport, map, selectedItem = nul
     }
 
     if (map.fields) {
-        for (const [key, field] of Object.entries(map.fields)) {
+        map.fields.forEach((field, index) => {
             const itemPage = field.page || 1;
-            if (itemPage !== currentPageNum) continue; // Skip if not on current page!
+            if (itemPage !== currentPageNum) return; 
 
             const px = field.x * viewport.scale;
             const ph = (field.height || 15) * viewport.scale;
             const py = viewport.height - (field.y * viewport.scale) - ph;
             const pw = (field.width || 60) * viewport.scale;
 
-            const isSelected = selectedItem && selectedItem.type === 'variable' && selectedItem.id === key;
+            const isSelected = selectedItem && selectedItem.type === 'variable' && selectedItem.id === index;
             drawBox(px, py, pw, ph, { fill: 'rgba(74, 246, 38, 0.3)', stroke: '#4af626' }, isSelected);
             
             ctx.fillStyle = '#000';
             ctx.font = 'bold 12px Arial';
-            ctx.fillText(key, px + 4, py + 16);
-        }
+            ctx.fillText(field.variable, px + 4, py + 16);
+        });
     }
 }
 
@@ -66,10 +66,12 @@ export function getHoveredItem(mouseX, mouseY, viewport, map, currentPageNum = 1
     };
 
     if (map.fields) {
-        for (const [key, field] of Object.entries(map.fields)) {
+        // Loop backward to prioritize clicking the box drawn most recently (top Z-index)
+        for (let i = map.fields.length - 1; i >= 0; i--) {
+            const field = map.fields[i];
             if ((field.page || 1) !== currentPageNum) continue;
             const action = checkHit(field.x, field.y, field.width || 60, field.height || 15);
-            if (action) return { type: 'variable', id: key, action };
+            if (action) return { type: 'variable', id: i, action };
         }
     }
 
