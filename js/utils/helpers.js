@@ -98,6 +98,25 @@ function calculateWaiverDates(targetMonth, targetYear, dueDayOffset, throughDay)
     };
 }
 
+// --- File to Base64 Translator for Email Attachments ---
+window.fileToBase64 = async function(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        
+        // Read the file and translate it into a Data URL string
+        reader.readAsDataURL(file);
+        
+        reader.onload = () => {
+            // The result looks like "data:application/pdf;base64,JVBERi0xLjQK..."
+            // We split at the comma to grab ONLY the raw Base64 characters
+            const base64String = reader.result.split(',')[1];
+            resolve(base64String);
+        };
+        
+        reader.onerror = (error) => reject(error);
+    });
+};
+
 // --- Upgraded Multipart EML Generator ---
 async function generateEmailFile(saveFolderHandle, fileName, to, cc, subject, htmlBody, attachmentHandles = []) {
     try {
