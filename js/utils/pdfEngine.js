@@ -1,5 +1,32 @@
 // js/utils/pdfEngine.js
 
+// --- Helper: Word Wrapper ---
+// Breaks a long string into an array of lines that fit inside a specific width
+function wrapText(text, font, fontSize, maxWidth) {
+    const paragraphs = String(text).split('\n');
+    const lines = [];
+    
+    for (const p of paragraphs) {
+        const words = p.split(' ');
+        let currentLine = '';
+        
+        for (const word of words) {
+            const testLine = currentLine ? currentLine + ' ' + word : word;
+            const width = font.widthOfTextAtSize(testLine, fontSize);
+            
+            if (width > maxWidth && currentLine !== '') {
+                lines.push(currentLine);
+                currentLine = word;
+            } else {
+                currentLine = testLine;
+            }
+        }
+        if (currentLine) lines.push(currentLine);
+    }
+    return lines;
+}
+
+
 window.stampWaiverWithConfig = async function(pdfArrayBuffer, vendorData, configJson) {
     if (!window.PDFLib) throw new Error("PDF-lib is not loaded. Check index.html script tags.");
     
@@ -9,6 +36,7 @@ window.stampWaiverWithConfig = async function(pdfArrayBuffer, vendorData, config
     const pages = pdfDoc.getPages();
     const firstPage = pages[0]; 
 
+    // Load the font so we can mathematically measure text width/height
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
     // 1. Draw Cover-Ups
@@ -39,29 +67,72 @@ window.stampWaiverWithConfig = async function(pdfArrayBuffer, vendorData, config
                 const pageNum = field.page || 1;
                 const targetPage = pages[pageNum - 1] || firstPage; 
                 
-                let finalFontSize = field.size || 12; 
+                const isBoxed = field.width && field.height && !isBarcode;
                 
-                if (field.width && field.height && !isBarcode) {
-                    finalFontSize = field.height; 
+                let finalFontSize = 12; // MAX FONT SIZE IS LOCKED TO 12pt
+                let lines = [textToPrint];
+
+                if (isBoxed) {
+                    // Ensure we don't start bigger than the box itself
+                    finalFontSize = Math.min(12, field.height);
+                    
+                    // Auto-Size Loop for Multiline Text
                     while (finalFontSize > 4) {
-                        const textWidth = font.widthOfTextAtSize(textToPrint, finalFontSize);
-                        const textHeight = font.heightAtSize(finalFontSize);
+                        lines = wrapText(textToPrint, font, finalFontSize, field.width);
+                        const totalTextHeight = lines.length * (finalFontSize * 1.2); // 20% line spacing
                         
-                        if (textWidth <= field.width && textHeight <= field.height) {
-                            break; 
+                        if (totalTextHeight <= field.height) {
+                            break; // The paragraph fits!
                         }
-                        finalFontSize -= 0.5; 
+                        finalFontSize -= 0.5; // Shrink font and try re-wrapping
                     }
+                } else if (isBarcode) {
+                    finalFontSize = 8; // Lock barcode to 8pt
+                } else {
+                    finalFontSize = field.size || 12; // Legacy dot fallback
                 }
 
-                targetPage.drawText(textToPrint, {
-                    x: field.x,
-                    y: field.y,
-                    size: finalFontSize,
-                    font: font, 
-                    color: rgb(0, 0, 0),
-                    rotate: isBarcode ? degrees(90) : degrees(0)
-                });
+                // --- RENDERING PHASE ---
+                if (isBarcode) {
+                    targetPage.drawText(textToPrint, {
+                        x: field.x,
+                        y: field.y,
+                        size: finalFontSize,
+                        font: font,
+                        color: rgb(0, 0, 0),
+                        rotate: degrees(90)
+                    });
+                } 
+                else if (isBoxed) {
+                    // Vertically center the paragraph inside the green box
+                    const totalTextHeight = lines.length * (finalFontSize * 1.2);
+                    const emptySpace = field.height - totalTextHeight;
+                    
+                    // Calculate the starting Y position (Top of box, minus half the empty space, minus font ascender)
+                    let currentY = (field.y + field.height) - (emptySpace / 2) - finalFontSize;
+                    
+                    // Draw each line of the paragraph
+                    for (const line of lines) {
+                        targetPage.drawText(line, {
+                            x: field.x,
+                            y: currentY,
+                            size: finalFontSize,
+                            font: font,
+                            color: rgb(0, 0, 0)
+                        });
+                        currentY -= (finalFontSize * 1.2); // Move down for the next line
+                    }
+                } 
+                else {
+                    // Legacy single-dot rendering
+                    targetPage.drawText(textToPrint, {
+                        x: field.x,
+                        y: field.y,
+                        size: finalFontSize,
+                        font: font,
+                        color: rgb(0, 0, 0)
+                    });
+                }
             }
         }
     }
