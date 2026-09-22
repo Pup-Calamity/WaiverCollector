@@ -218,7 +218,7 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
         const throughDay = jobSettings["Through Day"] || 31;
         const dueDay = parseInt(jobSettings["Due Day"]) || 15;
         const jobAllowsSkipZero = String(jobSettings["Skip Zero"] || "").trim().toLowerCase() === "yes";
-        const dueDate = new Date(parseInt(targetYear), parseInt(targetMonth) - 1, dueDay);
+        const dueDate = new Date(parseInt(targetYear), parseInt(targetMonth), dueDay);
 
         // 2. Determine Required Templates
         let requiredTemplates = [];
