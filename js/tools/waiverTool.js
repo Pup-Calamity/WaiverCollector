@@ -33,6 +33,31 @@ function prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, customThroug
         "Status": "Pending"
     };
 }
+// --- Helper: Find Existing Waiver ---
+function findExistingWaiver(jobId, vendorId, month, year, waiverType) {
+    const waivers = window.Workspace.appData.waivers || [];
+    const typeLetter = waiverType === "Final" ? "F" : (waiverType === "Conditional" ? "C" : "U");
+    
+    // 1. Try to find the exact match (including C/U/F type suffix)
+    let match = waivers.find(w => 
+        String(w["Job ID"]).trim() === String(jobId).trim() &&
+        String(w["Vendor ID"]).trim() === String(vendorId).trim() &&
+        String(w["Month"]).trim() === String(month).trim() &&
+        String(w["Year"]).trim() === String(year).trim() &&
+        String(w["Waiver ID"]).includes(typeLetter)
+    );
+
+    // 2. Fallback: Find ANY match for this vendor/job/month/year if suffix is missing
+    if (!match) {
+        match = waivers.find(w => 
+            String(w["Job ID"]).trim() === String(jobId).trim() &&
+            String(w["Vendor ID"]).trim() === String(vendorId).trim() &&
+            String(w["Month"]).trim() === String(month).trim() &&
+            String(w["Year"]).trim() === String(year).trim()
+        );
+    }
+    return match;
+}
 
 // --- Helper to Calculate Dates Based on Rule ---
 function calculatePeriodDates(targetMonth, targetYear, ruleType, throughDayStr) {
@@ -300,21 +325,36 @@ window.batchProcessWaivers = async function(jobId, vendorList, targetMonth, targ
                 const newPdfBytes = await stampWaiverWithConfig(pdfBuffer, mappingData, configJson);
                 
                 const typeLabel = waiverType === "Final" ? "FINAL" : (waiverType === "Conditional" ? "COND" : "UNCOND");
-                const safePdfName = `${jobId}_${vendorId}_${targetMonth}-${targetYear}_${typeLabel}.pdf`;
+                const safePdfName = `${jobId}_${vendorName}_${targetMonth}-${targetYear}_${typeLabel}_req.pdf`;
                 
-                const outFolder = await window.Workspace.dirHandle.getDirectoryHandle("Generated_Waivers", { create: true });
-                const outPdfHandle = await outFolder.getFileHandle(safePdfName, { create: true });
+                // --- NEW FOLDER STRUCTURE: Waivers / JobID / Month-Year / file.pdf ---
+                const waiversBase = await window.Workspace.dirHandle.getDirectoryHandle("Waivers", { create: true });
+                const jobFolder = await waiversBase.getDirectoryHandle(jobId, { create: true });
+                
+                // Pad month with zero for clean sorting (e.g., "09-2026")
+                const monthStr = String(targetMonth).padStart(2, '0');
+                const periodFolder = await jobFolder.getDirectoryHandle(`${monthStr}-${targetYear}`, { create: true });
+                
+                const outPdfHandle = await periodFolder.getFileHandle(safePdfName, { create: true });
                 const writablePdf = await outPdfHandle.createWritable();
                 await writablePdf.write(newPdfBytes);
                 await writablePdf.close();
 
-                generatedPdfHandles.push(outPdfHandle); // Store for the email
+                generatedPdfHandles.push(outPdfHandle); 
 
-                // Update Memory Tracker
-                const newRecord = prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, endingDay.toLocaleDateString(), dueDate.toLocaleDateString(), waiverType);
-                newRecord["Sent Date"] = new Date().toLocaleDateString();
-                newRecord["Status"] = "Sent";
-                newWaiverRecords.push(newRecord);
+                // UPDATE MEMORY (Do not push blindly)
+                let record = findExistingWaiver(jobId, vendorId, targetMonth, targetYear, waiverType);
+                if (!record) {
+                    record = prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, endingDay.toLocaleDateString(), dueDate.toLocaleDateString(), waiverType);
+                    window.Workspace.appData.waivers.push(record); 
+                }
+
+                record["Sent Date"] = new Date().toLocaleDateString();
+                record["Status"] = "Sent";
+                record["Through Period"] = endingDay.toLocaleDateString();
+                record["Due Date"] = dueDate.toLocaleDateString();
+                
+                recordsToUpdate.push(record);
 
                 vendorEmailBody += `<p>• ${waiverType} Waiver for period ending ${endingDay.toLocaleDateString()}.</p>`;
                 successCount++;
