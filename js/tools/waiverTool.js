@@ -19,39 +19,31 @@ function generateWaiverKey(jobId, vendorId, month, year, typePrefix = "") {
     return `${baseKey}-${nextNumber}`;
 }
 
-function prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, customThroughPeriod, customDueDate, waiverType) {
-    const xDate = new Date().toDateString()
+// --- Data Preparation Engine ---
+function prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, customThroughPeriod, customDueDate, waiverType, waiverMonthInt) {
     const typePrefix = waiverType === "Final" ? "F" : (waiverType === "Conditional" ? "C" : "U");
-
-    // Ensure calculateWaiverDates is globally available from helpers.js
-    let finalThroughPeriod = customThroughPeriod;
-    let finalDueDate = customDueDate;
-
-    if (typeof calculateWaiverDates === "function" && (!customThroughPeriod || !customDueDate)) {
-        const timing = calculateWaiverDates(targetMonth, targetYear, dueDayOffset, throughDay);
-        if (!customThroughPeriod) finalThroughPeriod = timing.throughPeriod;
-        if (!customDueDate) finalDueDate = timing.dueDate;
-    }
     
+    // Just creates the blank structure. The Batch Loop fills in the audit dates later!
     return {
         "Waiver ID": generateWaiverKey(jobId, vendorId, targetMonth, targetYear, typePrefix), 
         "Job ID": jobId,
         "Vendor ID": vendorId,
         "Month": targetMonth,
         "Year": targetYear,
-        "Waiver Month" "",        
-        "Through Period": finalThroughPeriod || "", 
-        "Status": "",
-        "Sent Date": "", // Keeping the old one if your UI relies on it
-        "Due Date": finalDueDate || "", 
+        "Waiver Month": waiverMonthInt || "",        
+        "Through Period": customThroughPeriod || "", 
+        "Status": "Pending",
+        "Sent Date": "", 
+        "Due Date": customDueDate || "", 
         "Original Send Date": "",
         "Action Date": "",
         "Times Sent": 0,
-        "Last Updated": `${x} ${today.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`,
-        "Updated By": currentUser,
+        "Last Updated": "",
+        "Updated By": "",
         "Notes": ""
     };
 }
+
 // --- Helper: Find Existing Waiver ---
 function findExistingWaiver(jobId, vendorId, month, year, waiverType) {
     const waivers = window.Workspace.appData.waivers || [];
@@ -80,7 +72,10 @@ function findExistingWaiver(jobId, vendorId, month, year, waiverType) {
 
 // --- Helper to Calculate Dates Based on Rule ---
 function calculatePeriodDates(targetMonth, targetYear, ruleType, throughDayStr) {
-    const rule = String(ruleType).trim().toLowerCase();
+    // If the rule is blank (usually for Unconditional if not explicitly set), assume Trailing
+    let rule = String(ruleType).trim().toLowerCase();
+    if (rule === "") rule = "trailing";
+    
     const throughDay = parseInt(throughDayStr) || 31;
     
     let mathMonth = parseInt(targetMonth) - 1; 
@@ -96,7 +91,10 @@ function calculatePeriodDates(targetMonth, targetYear, ruleType, throughDayStr) 
     const actualThroughDay = Math.min(throughDay, lastDayOfMathMonth);
     const endingDay = new Date(mathYear, mathMonth, actualThroughDay);
 
-    return { startDay, endingDay };
+    // Format the Waiver Month as a clean 2-digit string (e.g., "08" or "09")
+    const waiverMonthStr = String(mathMonth + 1).padStart(2, '0');
+
+    return { startDay, endingDay, waiverMonthStr };
 }
 
 
@@ -207,7 +205,7 @@ window.batchProcessWaivers = async function(jobId, vendorList, targetMonth, targ
     const waiversFileHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.waivers);
 
     let successCount = 0;
-    let newWaiverRecords = [];
+    let recordsToUpdate = []; // Consistently tracking updates and new records here
 
     // --- 2. Vendor Processing Loop ---
     for (const vendor of validationReport.validVendors) {
@@ -219,27 +217,35 @@ window.batchProcessWaivers = async function(jobId, vendorList, targetMonth, targ
             continue;
         }
 
-        let generatedPdfHandles = []; // Holds the file handles to attach to the email
+        let generatedPdfHandles = []; 
         let vendorEmailBody = "";
 
         // Loop through the 1 or 2 templates required for this vendor
         for (const templateData of vendor.templatesToRun) {
             const { type: waiverType, name: templateName, rule: timingRule } = templateData;
             
-            // Calculate specific dates for THIS template (Trailing vs Same Month)
-            const { startDay, endingDay } = calculatePeriodDates(targetMonth, targetYear, timingRule, throughDay);
+            // Extract the newly formatted strings
+            const { startDay, endingDay, waiverMonthStr } = calculatePeriodDates(targetMonth, targetYear, timingRule, throughDay);
+            const periodString = `${startDay.toLocaleDateString()} to ${endingDay.toLocaleDateString()}`;
 
             let finalAmount = WaiverMath.getAmount(jobId, vendorId, startDay, endingDay, isFinal, "<>");
 
             // Skip Zero Logic
             if (parseFloat(finalAmount.replace(/,/g, '')) <= 0 && jobAllowsSkipZero) {
                 logMsg(`Vendor ${vendorId} has $0 balance for ${waiverType}. Skipping.`);
-                const skippedRecord = prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, endingDay.toLocaleDateString(), dueDate.toLocaleDateString(), waiverType);
-                skippedRecord["Status"] = "Received"; 
-                skippedRecord["Received Date"] = new Date().toLocaleDateString();
-                skippedRecord["Sent Date"] = new Date().toLocaleDateString();
-                skippedRecord["Notes"] = `Auto-cleared: $0 balance for ${waiverType} period.`;
-                newWaiverRecords.push(skippedRecord);
+                
+                let record = findExistingWaiver(jobId, vendorId, targetMonth, targetYear, waiverType);
+                if (!record) {
+                    record = prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, periodString, dueDate.toLocaleDateString(), waiverType, waiverMonthStr);
+                    window.Workspace.appData.waivers.push(record); 
+                }
+
+                record["Status"] = "Received"; 
+                record["Received Date"] = new Date().toLocaleDateString();
+                record["Sent Date"] = new Date().toLocaleDateString();
+                record["Notes"] = `Auto-cleared: $0 balance for ${waiverType} period.`;
+                recordsToUpdate.push(record);
+                
                 continue; 
             }
 
@@ -346,11 +352,9 @@ window.batchProcessWaivers = async function(jobId, vendorList, targetMonth, targ
                 const typeLabel = waiverType === "Final" ? "FINAL" : (waiverType === "Conditional" ? "COND" : "UNCOND");
                 const safePdfName = `${jobId}_${vendorName}_${targetMonth}-${targetYear}_${typeLabel}_req.pdf`;
                 
-                // --- NEW FOLDER STRUCTURE: Waivers / JobID / Month-Year / file.pdf ---
+                // --- FOLDER STRUCTURE: Waivers / JobID / Month-Year / file.pdf ---
                 const waiversBase = await window.Workspace.dirHandle.getDirectoryHandle("Waivers", { create: true });
                 const jobFolder = await waiversBase.getDirectoryHandle(jobId, { create: true });
-                
-                // Pad month with zero for clean sorting (e.g., "09-2026")
                 const monthStr = String(targetMonth).padStart(2, '0');
                 const periodFolder = await jobFolder.getDirectoryHandle(`${monthStr}-${targetYear}`, { create: true });
                 
@@ -361,42 +365,36 @@ window.batchProcessWaivers = async function(jobId, vendorList, targetMonth, targ
 
                 generatedPdfHandles.push(outPdfHandle); 
 
-              // UPDATE MEMORY (Do not push blindly)
+                // UPDATE MEMORY 
                 let record = findExistingWaiver(jobId, vendorId, targetMonth, targetYear, waiverType);
                 if (!record) {
-                    record = prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, endingDay.toLocaleDateString(), dueDate.toLocaleDateString(), waiverType);
+                    record = prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, periodString, dueDate.toLocaleDateString(), waiverType, waiverMonthStr);
                     window.Workspace.appData.waivers.push(record); 
                 }
 
-                // --- NEW DATE & AUDIT MATH ---
+                // --- DATE & AUDIT MATH ---
                 const today = new Date();
                 const todayStr = today.toLocaleDateString();
-                
-                // Action Date = Today + 3 Days
                 const actionDate = new Date();
                 actionDate.setDate(actionDate.getDate() + 3);
                 
-                // Grab the current logged-in user from your Workspace state, default to "System" if somehow empty
                 const currentUser = window.Workspace?.currentUser?.name || localStorage.getItem('currentUser') || "System";
                 
-                // 1. Immutable Original Send Date (Only set if it's currently blank)
                 if (!record["Original Send Date"] || String(record["Original Send Date"]).trim() === "") {
                     record["Original Send Date"] = todayStr;
                 }
 
-                // 2. Increment Times Sent
                 let currentTimesSent = parseInt(record["Times Sent"]);
                 if (isNaN(currentTimesSent)) currentTimesSent = 0;
                 record["Times Sent"] = currentTimesSent + 1;
 
-                // 3. Update Audit Trail & Standard Fields
                 record["Last Updated"] = `${todayStr} ${today.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
                 record["Updated By"] = currentUser;
                 record["Action Date"] = actionDate.toLocaleDateString();
                 
                 record["Sent Date"] = todayStr; 
                 record["Status"] = "Sent";
-                record["Through Period"] = endingDay.toLocaleDateString();
+                record["Through Period"] = periodString; 
                 record["Due Date"] = dueDate.toLocaleDateString();
                 
                 recordsToUpdate.push(record);
@@ -409,7 +407,7 @@ window.batchProcessWaivers = async function(jobId, vendorList, targetMonth, targ
             }
         }
 
-        // Generate the Combined Email Draft
+        // Generate Email
         if (generatedPdfHandles.length > 0) {
             const vendorEmail = WaiverMath.getEmailInfo(jobId, vendorId, "Region Email");
             const vendorName = WaiverMath.getEmailInfo(jobId, vendorId, "Vendor Name");
@@ -431,13 +429,9 @@ window.batchProcessWaivers = async function(jobId, vendorList, targetMonth, targ
     }
 
     // --- 3. Batch Update Excel ---
-    if (newWaiverRecords.length > 0) {
+    if (recordsToUpdate.length > 0) {
         logMsg("Updating Master Tracker...");
-        await UpdateExcel(waiversFileHandle, newWaiverRecords, "Waiver ID", "Waivers");
-        
-        if (!window.Workspace.appData.waivers) window.Workspace.appData.waivers = [];
-        window.Workspace.appData.waivers.push(...newWaiverRecords);
-        
+        await UpdateExcel(waiversFileHandle, recordsToUpdate, "Waiver ID", "Waivers");
         if (typeof window.renderWaiverTable === "function") window.renderWaiverTable();
     }
 
