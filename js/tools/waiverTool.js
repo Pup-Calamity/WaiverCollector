@@ -34,13 +34,17 @@ function getWaiverRoutingInfo(jobId, vendorId, targetMonth, targetYear, endingDa
     let vendorName = vendorId;
     try { vendorName = WaiverMath.getEmailInfo(jobId, vendorId, "Vendor Name") || vendorId; } catch(e) {}
     
+    // Sanitize string to prevent OS save crashes
     const cleanVendorName = vendorName.replace(/[^a-zA-Z0-9 -]/g, "").trim() || vendorId;
     
+    // Format dates for file naming
     const waiverYear = String(endingDay.getFullYear()).slice(-2);
     const formattedWaiverMonth = String(endingDay.getMonth() + 1).padStart(2, '0');    
     const folderMonth = String(targetMonth).padStart(2, '0');
     
     const periodFolderName = `${folderMonth}-${targetYear}`;
+    
+    // Creates the base name: JobID-MMYY_VendorName
     const baseFileName = `${jobId}-${formattedWaiverMonth}${waiverYear}_${cleanVendorName}`;
 
     return {
@@ -48,7 +52,7 @@ function getWaiverRoutingInfo(jobId, vendorId, targetMonth, targetYear, endingDa
         periodFolderName,
         reqFileName: `${baseFileName}_${typeLabel}_req.pdf`,
         recFileName: `${baseFileName}_${typeLabel}_rec.pdf`,
-        emailFileName: `Draft_${baseFileName}`
+        emailFileName: baseFileName // Just the base name, omitting TYPE and req!
     };
 }
 
@@ -162,7 +166,7 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
 
         const jobSettings = window.Workspace.appData.jobNotes?.find(j => String(j["Job ID"]).trim().toLowerCase() === jobId.toLowerCase()) || {};
         const dueDay = parseInt(jobSettings["Due Day"]) || 15;
-        const dueDate = new Date(parseInt(targetYear), parseInt(targetMonth) - 1, dueDay);
+        const dueDate = new Date(parseInt(targetYear), parseInt(targetMonth), dueDay);
 
         if (String(WaiverMath.getEmailInfo(jobId, vendorId, "Manual Only")).trim().toLowerCase() === "yes") continue;
 
