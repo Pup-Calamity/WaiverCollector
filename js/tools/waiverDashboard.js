@@ -477,6 +477,9 @@ window.renderWaiverTable = function() {
             });
         }
 
+        tbody.appendChild(tr);
+    }
+
     if (matchCount === 0) {
         tbody.innerHTML = `<tr><td colspan="10" style="padding: 20px; text-align: center; color: var(--text-muted);">No waivers found matching these filters.</td></tr>`;
     }
