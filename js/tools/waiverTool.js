@@ -177,9 +177,6 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
         let allZeroBalance = true; 
         let finalPeriodString = "", finalWaiverMonthInt = "", finalEmailFileName = "";
 
-        // Track the official period details to stamp on the master row
-        let finalPeriodString = "", finalWaiverMonthInt = "";
-
         // Loop over the templates (Creates 1 or 2 PDFs for this single row)
         for (const templateData of requiredTemplates) {
             const { type: waiverType, name: templateName, rule: timingRule } = templateData;
