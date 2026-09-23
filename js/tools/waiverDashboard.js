@@ -140,20 +140,23 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Save Note Logic ---
-    const saveNoteBtn = document.getElementById('saveNoteBtn');
+   const saveNoteBtn = document.getElementById('saveNoteBtn');
     if (saveNoteBtn) {
         saveNoteBtn.addEventListener('click', async () => {
             const modal = document.getElementById('readNotesModal');
-            const waiverId = modal.dataset.waiverId;
+            
+            // Bulletproof way to retrieve the attribute
+            const waiverId = modal.getAttribute('data-waiver-id');
             const newNoteText = document.getElementById('newNoteInput').value.trim();
             
-            // If they didn't type anything, just close the modal
             if (!newNoteText) {
                 modal.close();
                 return; 
             }
 
-            if (!waiverId) return alert("Error: Could not identify the waiver record.");
+            if (!waiverId) {
+                return alert("Error: Could not identify the waiver record. Check if your Excel column is exactly 'Waiver ID'.");
+            }
 
             const waivers = window.Workspace.appData.waivers || [];
             const record = waivers.find(w => String(w["Waiver ID"]) === String(waiverId));
@@ -464,12 +467,15 @@ window.renderWaiverTable = function() {
             const rawNotes = row["Notes"] || "No notes available.";
             notesBtn.addEventListener('click', () => {
                 document.getElementById('notesModalContent').textContent = rawNotes;
+                document.getElementById('newNoteInput').value = "";
+                
+                // Bulletproof way to set the attribute
+                const idToSave = row["Waiver ID"] || row["WaiverID"] || ""; // Fallback in case of Excel header differences
+                document.getElementById('readNotesModal').setAttribute('data-waiver-id', idToSave);
+                
                 document.getElementById('readNotesModal').showModal();
             });
         }
-
-        tbody.appendChild(tr);
-    }
 
     if (matchCount === 0) {
         tbody.innerHTML = `<tr><td colspan="10" style="padding: 20px; text-align: center; color: var(--text-muted);">No waivers found matching these filters.</td></tr>`;
