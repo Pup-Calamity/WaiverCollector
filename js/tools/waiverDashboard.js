@@ -81,10 +81,16 @@ window.addEventListener('DOMContentLoaded', () => {
             }
 
             // --- Collect the exact Waiver IDs from the checked rows ---
-            const waiverIds = [];
+           const waiverIds = [];
             checkedBoxes.forEach(cb => {
-                const waiverId = cb.dataset.waiverId;
-                if (waiverId) waiverIds.push(waiverId);
+                // Try grabbing it through dataset or direct attribute as a fallback
+                const waiverId = cb.dataset.waiverId || cb.getAttribute('data-waiver-id');
+                
+                if (waiverId && waiverId !== "undefined" && String(waiverId).trim() !== "") {
+                    waiverIds.push(waiverId);
+                } else {
+                    console.warn("⚠️ Found a checked box, but it has no Waiver ID attached to it! Check your Excel sheet to ensure this row has a Waiver ID.", cb);
+                }
             });
 
             console.log(`🚀 Dispatching Batch for ${waiverIds.length} Waiver IDs...`, waiverIds);
@@ -343,7 +349,7 @@ window.renderWaiverTable = function() {
         tr.innerHTML = `
             <td style="padding: 12px; text-align: center;">
                 <input type="checkbox" class="row-checkbox" style="transform: scale(1.2); cursor: pointer;" 
-                       data-job="${jobId}" data-vendor="${vendorId}" data-month="${row["Month"]}" data-year="${row["Year"]}">
+                       data-waiver-id="${row["Waiver ID"]}">
             </td>
             <td style="padding: 12px;"><strong>${row["Waiver ID"] || ""}</strong></td>
             <td style="padding: 12px;">
