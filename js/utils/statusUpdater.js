@@ -23,13 +23,13 @@ async function refreshWaiverStatuses(logMsg = console.log) {
 
         // --- 1. POPULATE / FIX DUE DATE ---
         const jobSettings = jobNotesData.find(j => String(j["Job ID"]).trim().toLowerCase() === jobId) || {};
-        const dueDay = parseInt(jobSettings["Due Day"]) || 15;
+        const dueDay = parseInt(jobSettings["Due Day"]) || 25;
         const targetMonth = parseInt(waiver["Month"]);
         const targetYear = parseInt(waiver["Year"]);
         
         if (!isNaN(targetMonth) && !isNaN(targetYear)) {
             // Official contract due date (e.g. Sept 15, 2026)
-            const calculatedDueDate = new Date(targetYear, targetMonth - 1, dueDay).toLocaleDateString();
+            const calculatedDueDate = new Date(targetYear, targetMonth, dueDay).toLocaleDateString();
             
             if (String(waiver["Due Date"] || "").trim() !== calculatedDueDate) {
                 waiver["Due Date"] = calculatedDueDate;

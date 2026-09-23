@@ -175,7 +175,8 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
 
         let generatedPdfHandles = [], vendorEmailBody = "", targetWaiverFolder = null; 
         let allZeroBalance = true; 
-        
+        let finalPeriodString = "", finalWaiverMonthInt = "", finalEmailFileName = "";
+
         // Track the official period details to stamp on the master row
         let finalPeriodString = "", finalWaiverMonthInt = "";
 
@@ -204,6 +205,8 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
             try {
                 const typeLabel = waiverType === "Final" ? "FINAL" : (waiverType === "Conditional" ? "COND" : "UNCOND");
                 const routing = getWaiverRoutingInfo(jobId, vendorId, targetMonth, targetYear, endingDay, typeLabel);
+
+                finalEmailFileName = routing.emailFileName;
 
                 const contractAmount = parseFloat(WaiverMath.getEmailInfo(jobId, vendorId, "Contract Amount").replace(/,/g, '')) || 0;
                 const paidThruEnd = parseFloat(WaiverMath.getPaidThru(jobId, vendorId, endingDay, isFinal, "<>V").replace(/,/g, '')) || 0;
@@ -298,8 +301,8 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
             `;
             const subject = `Lien Waiver Required: Job ${jobId} - ${targetMonth}/${targetYear}`;
             
-            await generateEmailFile(emailsDir, emailFileName, vendorEmail, "", subject, emailBody, generatedPdfHandles);
-            if (targetWaiverFolder) await generateEmailFile(targetWaiverFolder, emailFileName, vendorEmail, "", subject, emailBody, generatedPdfHandles);
+            await generateEmailFile(emailsDir, finalEmailFileName, vendorEmail, "", subject, emailBody, generatedPdfHandles);
+            if (targetWaiverFolder) await generateEmailFile(targetWaiverFolder, finalEmailFileName, vendorEmail, "", subject, emailBody, generatedPdfHandles);
         }
     }
 
@@ -332,7 +335,7 @@ window.processReturnedWaivers = async function(waiverIds) {
         for (const templateData of requiredTemplates) {
             const { type: waiverType, rule: timingRule } = templateData;
             
-            const jobSettings = window.Workspace.appData.jobNotes?.find(j => String(j["Job ID"]).trim().toLowerCase() === job.toLowerCase()) || {};
+            const jobSettings = window.Workspace.appData.jobNotes?.find(j => String(j["Job ID"]).trim() === job) || {};
             const { endingDay } = calculatePeriodDates(record["Month"], record["Year"], timingRule, jobSettings["Through Day"] || 31);
             const typeLabel = waiverType === "Final" ? "FINAL" : (waiverType === "Conditional" ? "COND" : "UNCOND");
             
