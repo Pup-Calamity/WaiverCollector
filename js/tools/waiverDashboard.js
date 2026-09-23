@@ -138,6 +138,61 @@ window.addEventListener('DOMContentLoaded', () => {
             if (selectAllCb) selectAllCb.checked = false;
         });
     }
+
+    // --- Save Note Logic ---
+    const saveNoteBtn = document.getElementById('saveNoteBtn');
+    if (saveNoteBtn) {
+        saveNoteBtn.addEventListener('click', async () => {
+            const modal = document.getElementById('readNotesModal');
+            const waiverId = modal.dataset.waiverId;
+            const newNoteText = document.getElementById('newNoteInput').value.trim();
+            
+            // If they didn't type anything, just close the modal
+            if (!newNoteText) {
+                modal.close();
+                return; 
+            }
+
+            if (!waiverId) return alert("Error: Could not identify the waiver record.");
+
+            const waivers = window.Workspace.appData.waivers || [];
+            const record = waivers.find(w => String(w["Waiver ID"]) === String(waiverId));
+            
+            if (record) {
+                // 1. Format the new note with a date and user stamp
+                const todayStr = new Date().toLocaleDateString();
+                const user = window.Workspace?.currentUser?.name || localStorage.getItem('currentUser') || "User";
+                const formattedNote = `[${todayStr} - ${user}] ${newNoteText}`;
+                
+                // 2. Append it to existing notes (if any exist)
+                const currentNotes = String(record["Notes"] || "").trim();
+                if (currentNotes && currentNotes !== "No notes available.") {
+                    record["Notes"] = currentNotes + "\n" + formattedNote;
+                } else {
+                    record["Notes"] = formattedNote;
+                }
+
+                // 3. Save to Excel
+                try {
+                    saveNoteBtn.textContent = "Saving...";
+                    saveNoteBtn.disabled = true;
+                    
+                    const waiversFileHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.waivers);
+                    await UpdateExcel(waiversFileHandle, [record], "Waiver ID", "Waivers");
+                    
+                    // Re-render the table to reflect the new state
+                    if (typeof window.renderWaiverTable === "function") window.renderWaiverTable();
+                    
+                } catch (e) {
+                    alert("Error saving note: " + e.message);
+                } finally {
+                    saveNoteBtn.textContent = "Save Note";
+                    saveNoteBtn.disabled = false;
+                    modal.close();
+                }
+            }
+        });
+    }
 });
 
 
@@ -264,7 +319,13 @@ window.renderWaiverTable = function() {
         if (notesBtn) {
             const rawNotes = row["Notes"] || "No notes available.";
             notesBtn.addEventListener('click', () => {
+                // Populate existing notes
                 document.getElementById('notesModalContent').textContent = rawNotes;
+                // Clear the new note input box
+                document.getElementById('newNoteInput').value = "";
+                // Attach the Waiver ID to the modal itself so the Save button can find it!
+                document.getElementById('readNotesModal').dataset.waiverId = row["Waiver ID"];
+                
                 document.getElementById('readNotesModal').showModal();
             });
         }

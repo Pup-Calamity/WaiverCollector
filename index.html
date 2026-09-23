@@ -207,12 +207,19 @@
         </div>
     </div>
     
-    <!-- Read Notes Modal -->
+    <!-- Read/Add Notes Modal -->
     <dialog id="readNotesModal" style="padding: 25px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--surface-color); width: 450px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
         <h3 style="margin-top: 0; color: var(--text-main); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">Waiver Notes</h3>
-        <p id="notesModalContent" style="white-space: pre-wrap; color: var(--text-main); font-size: 14px; min-height: 80px; padding: 15px; background: var(--bg-color); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 20px;"></p>
-        <div style="display: flex; justify-content: flex-end;">
-            <button id="closeNotesModalBtn" class="primary-btn" style="width: auto; background: #6c757d;">Close</button>
+        
+        <!-- Historical Notes (Read Only) -->
+        <div id="notesModalContent" style="white-space: pre-wrap; color: var(--text-main); font-size: 14px; min-height: 80px; max-height: 200px; overflow-y: auto; padding: 15px; background: var(--bg-color); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 15px;"></div>
+        
+        <!-- Add New Note Area -->
+        <textarea id="newNoteInput" placeholder="Type a new note here..." style="width: 100%; box-sizing: border-box; height: 80px; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main); font-family: inherit; margin-bottom: 20px; resize: vertical;"></textarea>
+        
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button id="closeNotesModalBtn" class="secondary-btn" style="width: auto; padding: 6px 12px;">Cancel</button>
+            <button id="saveNoteBtn" class="primary-btn" style="width: auto; padding: 6px 16px; background: #3b82f6;">Save Note</button>
         </div>
     </dialog>
 

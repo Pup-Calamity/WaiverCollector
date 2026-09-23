@@ -144,6 +144,7 @@ async function validateWaiverRun(waiverIds, isFinal = false) {
 // ==========================================
 
 // --- Engine A: Batch Processor (Generation) ---
+// --- Engine A: Batch Processor (Generation) ---
 window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManualAmount = false) {
     const logMsg = (msg, isError = false) => console.log(`[Waiver Engine] ${isError ? '❌' : '✅'} ${msg}`);
     if (!Array.isArray(waiverIds) || waiverIds.length === 0) return alert("No waivers selected.");
@@ -165,10 +166,12 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
         const targetYear = String(record["Year"]).trim();
 
         const jobSettings = window.Workspace.appData.jobNotes?.find(j => String(j["Job ID"]).trim().toLowerCase() === jobId.toLowerCase()) || {};
-        const dueDay = parseInt(jobSettings["Due Day"]) || 15;
-        const dueDate = new Date(parseInt(targetYear), parseInt(targetMonth), dueDay);
 
         if (String(WaiverMath.getEmailInfo(jobId, vendorId, "Manual Only")).trim().toLowerCase() === "yes") continue;
+
+        // --- NEW: The 48-hour urgency date (stamped on PDF and Email) ---
+        const vendorDueDate = new Date();
+        vendorDueDate.setDate(vendorDueDate.getDate() + 2);
 
         let generatedPdfHandles = [], vendorEmailBody = "", targetWaiverFolder = null; 
         let allZeroBalance = true; 
@@ -228,7 +231,7 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
                     "startdate": startDay.toLocaleDateString(), "throughDate": endingDay.toLocaleDateString(),
                     "paidThruDate": new Date(startDay.getTime() - 86400000).toLocaleDateString(), 
                     "day": endingDay.getDate().toString(), "month": endingDay.toLocaleString('default', { month: 'long' }), "year": endingDay.getFullYear().toString(),
-                    "dueDate": dueDate.toLocaleDateString(),
+                    "dueDate": vendorDueDate.toLocaleDateString(), // <--- Uses 48-Hour Urgency Date here
                     "barcode": `${jobId} ${vendorId.padStart(10, '0')} ${endingDay.toLocaleDateString('en-US', {month: '2-digit', year: '2-digit'}).replace('/', '')} |${endingDay.toLocaleDateString('en-US', {month: '2-digit'})}`
                 };
 
@@ -253,7 +256,6 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
         }
 
         // --- SINGLE ROW UPDATE ---
-        // Updates the single master tracker row for this vendor/month based on the aggregated results
         const todayStr = new Date().toLocaleDateString();
 
         if (allZeroBalance) {
@@ -261,6 +263,7 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
                 "Status": "Received", "Received Date": todayStr, "Sent Date": todayStr, 
                 "Through Period": finalPeriodString, "Waiver Month": finalWaiverMonthInt,
                 "Notes": `Auto-cleared: $0 balance for period.`
+                // Due Date intentionally omitted
             });
             recordsToUpdate.push(record);
             skippedZeroCount++;
@@ -275,7 +278,8 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
                 "Last Updated": `${todayStr} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`,
                 "Updated By": window.Workspace?.currentUser?.name || "System",
                 "Action Date": actionDate.toLocaleDateString(),
-                "Sent Date": todayStr, "Status": "Sent", "Through Period": finalPeriodString, "Due Date": dueDate.toLocaleDateString()
+                "Sent Date": todayStr, "Status": "Sent", "Through Period": finalPeriodString
+                // Due Date intentionally omitted (Managed by Status Updater)
             });
             recordsToUpdate.push(record);
             successCount++;
@@ -284,14 +288,16 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
             const vendorEmail = WaiverMath.getEmailInfo(jobId, vendorId, "Region Email");
             const vendorName = WaiverMath.getEmailInfo(jobId, vendorId, "Vendor Name");
             const emailFileName = getWaiverRoutingInfo(jobId, vendorId, targetMonth, targetYear, new Date(), "").emailFileName;
+            
             const emailBody = `
                 <div style="font-family: Calibri, sans-serif; font-size: 11pt; color: #333;">
                     <p>Hello ${vendorName},</p><p>Please review and sign the attached Lien Waiver(s):</p>
-                    ${vendorEmailBody}<p>Please return by <strong>${dueDate.toLocaleDateString()}</strong>.</p>
+                    ${vendorEmailBody}<p>Please return by <strong>${vendorDueDate.toLocaleDateString()}</strong>.</p>
                 </div>
                 ${typeof getEmailSignature === 'function' ? getEmailSignature() : ''}
             `;
             const subject = `Lien Waiver Required: Job ${jobId} - ${targetMonth}/${targetYear}`;
+            
             await generateEmailFile(emailsDir, emailFileName, vendorEmail, "", subject, emailBody, generatedPdfHandles);
             if (targetWaiverFolder) await generateEmailFile(targetWaiverFolder, emailFileName, vendorEmail, "", subject, emailBody, generatedPdfHandles);
         }
