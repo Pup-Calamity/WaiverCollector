@@ -98,52 +98,73 @@ function calculatePeriodDates(targetMonth, targetYear, ruleType, throughDayStr) 
 }
 
 
-// --- Pre-Flight Validator ---
-async function validateWaiverRun(targetMonth, targetYear, vendorList, jobId, isFinal) {
+// --- Pre-Flight Validator (Waiver ID Driven) ---
+async function validateWaiverRun(waiverIds, isFinal = false) {
     const appData = window.Workspace.appData;
     let errorLog = [];
-    let validVendors = [];
+    let validRecords = [];
 
+    const allWaivers = appData.waivers || [];
     const jobNotesData = appData.jobNotes || [];
-    const jobSettings = jobNotesData.find(j => String(j["Job ID"]).trim().toLowerCase() === String(jobId).trim().toLowerCase()) || {};
-
-    const condRule = String(jobSettings["Conditional"] || "").trim();
-    const uncondRule = String(jobSettings["Unconditional"] || "").trim();
+    const contractInfoData = appData.contractInfo || [];
 
     // Open the local Templates folder to verify files actually exist
     const templatesDir = await window.Workspace.dirHandle.getDirectoryHandle('Templates', { create: true });
 
-    for (const vendorId of vendorList) {
-        const vendor = String(vendorId).trim();
-        const job = String(jobId).trim();
+    for (const waiverId of waiverIds) {
+        const record = allWaivers.find(w => String(w["Waiver ID"]).trim() === String(waiverId).trim());
         
-        let requiredTemplates = []; 
+        if (!record) {
+            errorLog.push(`- Waiver ID '${waiverId}': Not found in Master Waiver sheet data.`);
+            continue;
+        }
+
+        const jobId = String(record["Job ID"]).trim();
+        const vendorId = String(record["Vendor ID"]).trim();
+        const targetMonth = String(record["Month"]).trim();
+        
+        // 1. Check Job Settings
+        const jobSettings = jobNotesData.find(j => String(j["Job ID"]).trim().toLowerCase() === jobId.toLowerCase()) || {};
+        const condRule = String(jobSettings["Conditional"] || "").trim();
+        const uncondRule = String(jobSettings["Unconditional"] || "").trim();
+
+        let requiredTemplates = [];
 
         if (isFinal) {
-            const finalTemp = WaiverMath.getEmailInfo(job, vendor, "Final Template");
+            const finalTemp = WaiverMath.getEmailInfo(jobId, vendorId, "Final Template");
             if (!finalTemp) {
-                errorLog.push(`- ${vendor}: Missing 'Final Template' in Contract Info.`);
+                errorLog.push(`- Job ${jobId} / Vendor ${vendorId}: Missing 'Final Template' in Contract Info.`);
             } else {
                 requiredTemplates.push({ type: "Final", name: finalTemp, rule: "Same Month" });
             }
         } else {
-            // Check Conditional
+            // Depending on what template rules are active, determine what this record needs.
+            // If both conditional and unconditional rules exist on the job, we check which template is assigned.
             if (condRule) {
-                const condTemp = WaiverMath.getEmailInfo(job, vendor, "Conditional Template");
-                if (!condTemp) errorLog.push(`- ${vendor}: Job requires Conditional, but missing 'Conditional Template' in Contract Info.`);
-                else requiredTemplates.push({ type: "Conditional", name: condTemp, rule: condRule });
+                const condTemp = WaiverMath.getEmailInfo(jobId, vendorId, "Conditional Template");
+                if (condTemp) requiredTemplates.push({ type: "Conditional", name: condTemp, rule: condRule });
             }
-            // Check Unconditional
             if (uncondRule) {
-                const uncondTemp = WaiverMath.getEmailInfo(job, vendor, "Unconditional Template");
-                if (!uncondTemp) errorLog.push(`- ${vendor}: Job requires Unconditional, but missing 'Unconditional Template' in Contract Info.`);
-                else requiredTemplates.push({ type: "Unconditional", name: uncondTemp, rule: uncondRule });
+                const uncondTemp = WaiverMath.getEmailInfo(jobId, vendorId, "Unconditional Template");
+                if (uncondTemp) requiredTemplates.push({ type: "Unconditional", name: uncondTemp, rule: uncondRule });
             }
-            
-            if (requiredTemplates.length === 0) continue; 
+
+            if (requiredTemplates.length === 0) {
+                errorLog.push(`- Job ${jobId} / Vendor ${vendorId}: No active Conditional/Unconditional template rules found in Job Notes.`);
+            }
         }
 
-        // Verify the PDF and the JSON map exist in the actual local Templates folder
+        // 2. Verify Email / Contract Setup
+        const hasEmailSetup = contractInfoData.some(row => 
+            String(row["Job ID"] || '').trim().toLowerCase() === jobId.toLowerCase() &&
+            String(row["Vendor ID"] || '').trim().toLowerCase() === vendorId.toLowerCase()
+        );
+
+        if (!hasEmailSetup) {
+            errorLog.push(`- Job ${jobId} / Vendor ${vendorId}: Missing Contract/Email Information setup.`);
+        }
+
+        // 3. Verify the PDF and JSON map exist in the local Templates folder
         for (const req of requiredTemplates) {
             let pdfExists = true;
             let jsonExists = true;
@@ -158,23 +179,25 @@ async function validateWaiverRun(targetMonth, targetYear, vendorList, jobId, isF
                 let missing = [];
                 if (!pdfExists) missing.push("PDF File");
                 if (!jsonExists) missing.push("Mapped JSON Config");
-                errorLog.push(`- ${vendor}: Missing ${missing.join(" and ")} for template '${req.name}' in the Templates folder.`);
+                errorLog.push(`- Waiver ID ${waiverId} (${vendorId}): Missing ${missing.join(" and ")} for template '${req.name}' in the Templates folder.`);
             }
         }
 
-        if (errorLog.filter(e => e.includes(vendor)).length === 0) {
-            validVendors.push({ vendorId: vendor, templatesToRun: requiredTemplates });
+        // If this record passed all checks, add it to our valid queue along with its record data
+        if (errorLog.filter(e => e.includes(waiverId)).length === 0) {
+            validRecords.push({ waiverId, record, requiredTemplates });
         }
     }
 
     return {
         passed: errorLog.length === 0,
         errors: errorLog,
-        validVendors: validVendors
+        validRecords: validRecords
     };
 }
 
-// --- Master Batch Processor (Driven purely by Waiver IDs) ---
+
+//Creates the Waivers
 window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManualAmount = false) {
     const logMsg = (msg, isError = false) => {
         console.log(`[Waiver Engine] ${isError ? '❌' : '✅'} ${msg}`);
@@ -185,70 +208,38 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
         return;
     }
 
-    logMsg(`Starting batch process for ${waiverIds.length} selected Waiver IDs...`);
+    // --- 1. Run Pre-Flight Validation using the explicit Waiver IDs ---
+    const validationReport = await validateWaiverRun(waiverIds, isFinal);
+    
+    if (!validationReport.passed) {
+        alert("Pre-Check Failed! Please fix the following issues:\n\n" + validationReport.errors.join("\n"));
+        return;
+    }
+
+    logMsg(`Validation passed. Processing ${validationReport.validRecords.length} verified waiver items...`);
 
     const templatesDir = await window.Workspace.dirHandle.getDirectoryHandle('Templates', { create: true });
     const emailsDir = await window.Workspace.dirHandle.getDirectoryHandle('Generated_Emails', { create: true });
     const waiversFileHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.waivers);
-    const allWaivers = window.Workspace.appData.waivers || [];
 
     let successCount = 0;
     let recordsToUpdate = []; 
 
-    // Process each waiver ID independently by pulling its row data straight from memory
-    for (const targetWaiverId of waiverIds) {
-        const record = allWaivers.find(w => String(w["Waiver ID"]).trim() === String(targetWaiverId).trim());
-        
-        if (!record) {
-            logMsg(`Error: Waiver ID '${targetWaiverId}' not found in Master Waiver data. Skipping.`, true);
-            continue;
-        }
-
+    // --- 2. Process Verified Records ---
+    for (const item of validationReport.validRecords) {
+        const { waiverId, record, requiredTemplates } = item;
         const jobId = String(record["Job ID"]).trim();
         const vendorId = String(record["Vendor ID"]).trim();
         const targetMonth = String(record["Month"]).trim();
         const targetYear = String(record["Year"]).trim();
 
-        logMsg(`Processing Waiver ID: ${targetWaiverId} | Job: ${jobId} | Vendor: ${vendorId}`);
-
-        // 1. Grab Job Settings & Rules for this Job
         const jobNotesData = window.Workspace.appData.jobNotes || [];
         const jobSettings = jobNotesData.find(j => String(j["Job ID"]).trim().toLowerCase() === jobId.toLowerCase()) || {};
         
         const throughDay = jobSettings["Through Day"] || 31;
         const dueDay = parseInt(jobSettings["Due Day"]) || 15;
         const jobAllowsSkipZero = String(jobSettings["Skip Zero"] || "").trim().toLowerCase() === "yes";
-        const dueDate = new Date(parseInt(targetYear), parseInt(targetMonth), dueDay);
-
-        // 2. Determine Required Templates
-        let requiredTemplates = [];
-        const condRule = String(jobSettings["Conditional"] || "").trim();
-        const uncondRule = String(jobSettings["Unconditional"] || "").trim();
-
-        if (isFinal) {
-            const finalTemp = WaiverMath.getEmailInfo(jobId, vendorId, "Final Template");
-            if (!finalTemp) {
-                logMsg(`- ${vendorId}: Missing 'Final Template' in Contract Info. Skipping.`, true);
-                continue;
-            }
-            requiredTemplates.push({ type: "Final", name: finalTemp, rule: "Same Month" });
-        } else {
-            // Determine if this row corresponds to Conditional or Unconditional based on what's configured
-            // (If both rules exist, we check if the row implies one or check context. For safety, we evaluate both if needed, or run the matching rule)
-            if (condRule) {
-                const condTemp = WaiverMath.getEmailInfo(jobId, vendorId, "Conditional Template");
-                if (condTemp) requiredTemplates.push({ type: "Conditional", name: condTemp, rule: condRule });
-            }
-            if (uncondRule) {
-                const uncondTemp = WaiverMath.getEmailInfo(jobId, vendorId, "Unconditional Template");
-                if (uncondTemp) requiredTemplates.push({ type: "Unconditional", name: uncondTemp, rule: uncondRule });
-            }
-        }
-
-        if (requiredTemplates.length === 0) {
-            logMsg(`- ${vendorId}: No active template rules found for Job ${jobId}. Skipping.`);
-            continue;
-        }
+        const dueDate = new Date(parseInt(targetYear), parseInt(targetMonth) - 1, dueDay);
 
         // Check Manual Only flag
         const isManualOnly = String(WaiverMath.getEmailInfo(jobId, vendorId, "Manual Only")).trim().toLowerCase();
@@ -260,7 +251,6 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
         let generatedPdfHandles = []; 
         let vendorEmailBody = "";
 
-        // 3. Loop through templates
         for (const templateData of requiredTemplates) {
             const { type: waiverType, name: templateName, rule: timingRule } = templateData;
             
@@ -288,17 +278,7 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
             }
 
             try {
-                // Verify Template Files exist
-                let pdfExists = true, jsonExists = true;
-                try { await templatesDir.getFileHandle(`${templateName}.pdf`); } catch { pdfExists = false; }
-                try { await templatesDir.getFileHandle(`${templateName}_Config.json`); } catch { jsonExists = false; }
-
-                if (!pdfExists || !jsonExists) {
-                    logMsg(`Error: Missing template files for '${templateName}' in Templates folder.`, true);
-                    continue;
-                }
-
-                // --- Payload Construction ---
+                // --- Payload Construction & Stamping ---
                 const vendorName = WaiverMath.getEmailInfo(jobId, vendorId, "Vendor Name");
                 const jobName = WaiverMath.getEmailInfo(jobId, vendorId, "Job Name");
                 
@@ -407,7 +387,7 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
 
                 generatedPdfHandles.push(outPdfHandle); 
 
-                // --- UPDATE THE EXISTING RECORD IN MEMORY ---
+                // --- UPDATE RECORD IN MEMORY DIRECTLY ---
                 const today = new Date();
                 const todayStr = today.toLocaleDateString();
                 const actionDate = new Date();
@@ -459,7 +439,7 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
             `;
             const emailSubject = `Lien Waiver Required: Job ${jobId} - ${targetMonth}/${targetYear}`;
             await generateEmailFile(emailsDir, `Draft_${jobId}_${vendorId}_${targetMonth}-${targetYear}.eml`, vendorEmail, "", emailSubject, emailBody, generatedPdfHandles);
-            logMsg(`Successfully drafted email for Waiver ID ${targetWaiverId}.`);
+            logMsg(`Successfully drafted email for Waiver ID ${waiverId}.`);
         }
     }
 
