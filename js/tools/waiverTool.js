@@ -143,7 +143,68 @@ async function validateWaiverRun(waiverIds, isFinal = false) {
 // 3. CORE ENGINES
 // ==========================================
 
-// --- Engine A: Batch Processor (Generation) ---
+// --- Invoice Gathering Helper ---
+function promptForInvoices(uniqueJobs) {
+    return new Promise((resolve) => {
+        const jobString = `(${uniqueJobs.join(',')})`;
+        
+        // Auto-copy to clipboard immediately
+        navigator.clipboard.writeText(jobString).catch(e => console.warn("Clipboard auto-copy blocked by browser.", e));
+
+        const dialog = document.createElement('dialog');
+        dialog.style.cssText = "padding: 25px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--surface-color); width: 450px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);";
+        
+        dialog.innerHTML = `
+            <h3 style="margin-top: 0; color: var(--text-main); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">Gather Invoices Required</h3>
+            <p style="color: var(--text-main); font-size: 14px; margin-bottom: 15px;">
+                Before generating these waivers, please gather the invoices for the following jobs. The list has been <strong>automatically copied to your clipboard</strong>.
+            </p>
+            <div id="copyBox" title="Click to copy again" style="background: var(--bg-color); padding: 12px; border-radius: 6px; border: 1px dashed var(--border-color); font-family: monospace; text-align: center; margin-bottom: 20px; font-size: 16px; user-select: all; cursor: pointer; color: var(--text-main);">
+                ${jobString}
+            </div>
+            <p style="color: var(--text-main); font-size: 14px; margin-bottom: 20px;">
+                Once you have saved the invoice file, click Continue to locate and select it.
+            </p>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button id="cancelInvoiceBtn" style="padding: 6px 12px; background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); border-radius: 4px; cursor: pointer;">Cancel Batch</button>
+                <button id="continueInvoiceBtn" style="padding: 6px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">Continue & Select File</button>
+            </div>
+        `;
+        
+        document.body.appendChild(dialog);
+        dialog.showModal();
+
+        // Fallback manual copy (just in case the browser blocked the auto-copy)
+        const copyBox = dialog.querySelector('#copyBox');
+        copyBox.addEventListener('click', () => {
+            navigator.clipboard.writeText(jobString);
+            const oldBg = copyBox.style.backgroundColor;
+            copyBox.style.backgroundColor = "#dcfce7"; // Flash green to confirm
+            setTimeout(() => copyBox.style.backgroundColor = oldBg, 200);
+        });
+
+        dialog.querySelector('#cancelInvoiceBtn').addEventListener('click', () => {
+            document.body.removeChild(dialog);
+            resolve(null); // Return null to indicate cancellation
+        });
+
+        dialog.querySelector('#continueInvoiceBtn').addEventListener('click', async () => {
+            document.body.removeChild(dialog);
+            try {
+                // Trigger the native file picker
+                const [fileHandle] = await window.showOpenFilePicker({
+                    types: [{ description: 'Invoice Files', accept: {'*/*': []} }],
+                    multiple: false
+                });
+                resolve(fileHandle);
+            } catch (err) {
+                console.log("User canceled file selection.");
+                resolve(null);
+            }
+        });
+    });
+}
+
 // --- Engine A: Batch Processor (Generation) ---
 window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManualAmount = false) {
     const logMsg = (msg, isError = false) => console.log(`[Waiver Engine] ${isError ? '❌' : '✅'} ${msg}`);
@@ -151,6 +212,20 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
 
     const validationReport = await validateWaiverRun(waiverIds, isFinal);
     if (!validationReport.passed) return alert("Pre-Check Failed:\n\n" + validationReport.errors.join("\n"));
+
+    // --- NEW: INVOICE GATHERING WORKFLOW ---
+    // Extract unique jobs from the validated records
+    const uniqueJobs = [...new Set(validationReport.validRecords.map(item => String(item.record["Job ID"]).trim()))];
+    
+    // Pause execution, copy to clipboard, and prompt for the file
+    const invoiceFileHandle = await promptForInvoices(uniqueJobs);
+    
+    // If they clicked Cancel or closed the file picker, abort the batch safely
+    if (!invoiceFileHandle) {
+        logMsg("Batch aborted: User canceled the invoice gathering step.");
+        return;
+    }
+    // ----------------------------------------
 
     const templatesDir = await window.Workspace.dirHandle.getDirectoryHandle('Templates', { create: true });
     const emailsDir = await window.Workspace.dirHandle.getDirectoryHandle('Generated_Emails', { create: true });
