@@ -112,6 +112,32 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // --- Return / Receive Waivers Hook ---
+    const returnWaiversBtn = document.getElementById('returnWaiversBtn');
+    if (returnWaiversBtn) {
+        returnWaiversBtn.addEventListener('click', async () => {
+            const checkedBoxes = Array.from(document.querySelectorAll('.row-checkbox:checked'));
+            
+            if (checkedBoxes.length === 0) {
+                return alert("Please check at least one waiver row to mark as returned.");
+            }
+
+            const waiverIds = [];
+            checkedBoxes.forEach(cb => {
+                const waiverId = cb.dataset.waiverId;
+                if (waiverId) waiverIds.push(waiverId);
+            });
+
+            // Fire the return engine
+            await window.processReturnedWaivers(waiverIds);
+
+            // Uncheck all boxes when done
+            document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = false);
+            const selectAllCb = document.getElementById('selectAllWaivers');
+            if (selectAllCb) selectAllCb.checked = false;
+        });
+    }
 });
 
 
@@ -388,3 +414,5 @@ window.renderWaiverTable = function() {
         tbody.innerHTML = `<tr><td colspan="10" style="padding: 20px; text-align: center; color: var(--text-muted);">No waivers found matching these filters.</td></tr>`;
     }
 };
+
+

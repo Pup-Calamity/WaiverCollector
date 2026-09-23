@@ -15,14 +15,18 @@
 <body>
 
     <!-- Top Navigation -->
-    <nav style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; border-bottom: 1px solid var(--border-color); background: var(--bg-color);">
-        <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+    <nav style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; align-items: center; padding: 10px 20px; width: 100%; box-sizing: border-box; border-bottom: 1px solid var(--border-color); background: var(--bg-color);">
+        
+        <!-- Left Section -->
+        <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 200px;">
             <div id="navStatus" class="status-pill" style="margin: 0;">🔴 Disconnected</div>
             <button id="changeFolderBtn" style="background: transparent; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: 4px; padding: 4px 8px; font-size: 0.8em; cursor: pointer; transition: all 0.2s;">
                 Change Folder
             </button>
         </div>
-        <div style="display: flex; align-items: center; justify-content: center; gap: 12px; flex: 1;">
+        
+        <!-- Center Section -->
+        <div style="display: flex; align-items: center; justify-content: center; gap: 12px; flex: 1; min-width: 250px;">
             <button id="manualSyncBtn" class="primary-btn" style="width: auto; margin: 0; padding: 6px 16px; background: #3b82f6; font-size: 0.9em;">
                 📥 Sync Data
             </button>
@@ -30,12 +34,15 @@
                 Waiting for sync...
             </span>
         </div>
-        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex: 1;">
+        
+        <!-- Right Section -->
+        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex: 1; min-width: 150px;">
             <button id="themeToggle" class="icon-btn" title="Toggle Dark Mode" style="margin: 0; padding: 6px;">🌙</button>
             <button id="logoutBtn" style="width: auto; margin: 0; padding: 6px 12px; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em; cursor: pointer; transition: all 0.2s;">
                 Log Out
             </button>
         </div>
+        
     </nav>
 
     <!-- VIEW 1: Connect Folder -->
@@ -167,9 +174,8 @@
                 </select>
             </div>
 
-            <button id="openBatchGeneratorBtn" class="primary-btn" style="background: #10b981; width: auto; padding: 10px 20px;">
-                🚀 Run Batch Generator
-            </button>
+            <button id="openBatchGeneratorBtn" class="primary-btn" style="background: #10b981; width: auto; padding: 10px 20px;">🚀 Run Batch Generator</button>
+            <button id="returnWaiversBtn" class="secondary-btn" style="padding: 8px 16px;">📥 Mark as Received (Return)</button>
         </div>
 
         <!-- Data Table Wrapper -->
