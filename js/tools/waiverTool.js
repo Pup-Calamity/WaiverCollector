@@ -223,13 +223,13 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
     }
 
     try {
-        logMsg("Reading selected invoice file...");
+        logMsg("Reading selected invoice file for this batch...");
         const file = await invoiceFileHandle.getFile();
         const arrayBuffer = await file.arrayBuffer();
 
         // Parse the Excel file using SheetJS
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const sheetName = workbook.SheetNames[0]; // Grabs the first tab
+        const sheetName = workbook.SheetNames[0]; 
         const newInvoiceData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
 
         if (!newInvoiceData || newInvoiceData.length === 0) {
@@ -237,30 +237,12 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
             return;
         }
 
-        // 1. Replace the table in live memory so the math engine uses it immediately
+        // Replace the table strictly in live memory for this run
         window.Workspace.appData.waiverInvoices = newInvoiceData;
-        logMsg(`Successfully loaded ${newInvoiceData.length} invoice rows.`);
-
-        // 2. Overwrite your persistent Master Workspace file so the data stays updated for next time
-        if (window.WORKSPACE_FILE_PATHS && window.WORKSPACE_FILE_PATHS.waiverInvoices) {
-            const masterInvoiceHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.waiverInvoices);
-            if (masterInvoiceHandle) {
-                logMsg("Saving new invoice data to Master Workspace...");
-                
-                // Creates a new workbook and overwrites the old one
-                const newWb = XLSX.utils.book_new();
-                const newWs = XLSX.utils.json_to_sheet(newInvoiceData);
-                XLSX.utils.book_append_sheet(newWb, newWs, "WaiverInvoices");
-                
-                const excelBuffer = XLSX.write(newWb, { bookType: 'xlsx', type: 'array' });
-                const writable = await masterInvoiceHandle.createWritable();
-                await writable.write(excelBuffer);
-                await writable.close();
-            }
-        }
+        logMsg(`Successfully loaded ${newInvoiceData.length} invoice rows into temporary memory.`);
 
     } catch (err) {
-        alert("CRITICAL ERROR: Failed to process the invoice file. Make sure it is a valid Excel file.\n\n" + err.message);
+        alert("CRITICAL ERROR: Failed to process the invoice file.\n\n" + err.message);
         return;
     }
     // --------------------------------------------------
