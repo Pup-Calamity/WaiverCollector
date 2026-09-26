@@ -241,7 +241,7 @@ async function processApproval() {
             alert(`Warning: Could not find a pending record in Master Waiver for Job ${finalJob}, Vendor ${finalVendor}. File will still be routed.`);
         }
 
-        await routeFileLocally(activeQueueItem["File Name"], finalJob, finalMonth, finalYear);
+        await routeFileLocally(activeQueueItem["File Name"], finalJob, finalVendor, finalWaiverMonth, finalWaiverYear, finalType);
 
         activeQueueItem["Status"] = "Approved";
         activeQueueItem["Extracted Job ID"] = finalJob; 
@@ -318,7 +318,7 @@ async function processRejection() {
 }
 
 // --- 6. Route to Final Job Folder ---
-async function routeFileLocally(fileName, targetJob, targetMonth, targetYear) {
+async function routeFileLocally(fileName, targetJob, vendorId, waiverMonth, waiverYear, waiverType) {
     try {
         const baseFolder = await getAttachmentsBaseFolder();
         const triageFolder = await baseFolder.getDirectoryHandle('Waivers_2_Triage');
@@ -326,14 +326,45 @@ async function routeFileLocally(fileName, targetJob, targetMonth, targetYear) {
         const fileHandle = await triageFolder.getFileHandle(fileName);
         const file = await fileHandle.getFile();
 
-        const formattedMonth = String(targetMonth).padStart(2, '0');
-        const folderName = `${formattedMonth}-${targetYear}`;
+        // 1. Look up Vendor Name and sanitize for OS saving
+        let vendorName = vendorId;
+        try { vendorName = window.WaiverMath.getEmailInfo(targetJob, vendorId, "Vendor Name") || vendorId; } catch(e) {}
+        const cleanVendorName = vendorName.replace(/[^a-zA-Z0-9 -]/g, "").trim();
 
+        // 2. Look up BURG Name from Master Job Info
+        const jobInfo = window.Workspace.appData.jobInfo || [];
+        const jobData = jobInfo.find(j => String(j["Job ID"]).trim().toLowerCase() === String(targetJob).toLowerCase()) || {};
+        let burgName = String(jobData["BURG Name"] || "Unknown Burg").trim().replace(/[^a-zA-Z0-9 -]/g, "");
+
+        // 3. Format Strings (e.g. Folder: 08-2026 | File: 21587-0826_Buckeye...)
+        const formattedWMonth = String(waiverMonth).padStart(2, '0');
+        const wYear4 = String(waiverYear);
+        const wYear2 = wYear4.slice(-2);
+
+        const folderName = `${formattedWMonth}-${wYear4}`; // Waivers go into the Waiver Date folder, not Pay App
+        const newFileName = `${targetJob}-${formattedWMonth}${wYear2}_${cleanVendorName}_${waiverType}_rec.pdf`;
+
+        // 4. Drill down: Waivers -> BURG -> JobID -> MM-YYYY
         const waiversBase = await window.Workspace.dirHandle.getDirectoryHandle("Waivers", { create: true });
-        const jobFolder = await waiversBase.getDirectoryHandle(targetJob, { create: true });
+        
+        // Loop through the Waivers folder to find a Burg folder that contains the name
+        let burgFolder = null;
+        for await (const entry of waiversBase.values()) {
+            if (entry.kind === 'directory' && entry.name.toLowerCase().includes(burgName.toLowerCase())) {
+                burgFolder = await waiversBase.getDirectoryHandle(entry.name);
+                break;
+            }
+        }
+        
+        // Fallback: If no folder contains the name, create a clean one
+        if (!burgFolder) {
+            burgFolder = await waiversBase.getDirectoryHandle(burgName, { create: true });
+        }
+
+        const jobFolder = await burgFolder.getDirectoryHandle(targetJob, { create: true });
         const periodFolder = await jobFolder.getDirectoryHandle(folderName, { create: true });
 
-        const newFileName = `${targetJob}_${fileName}`;
+        // 5. Save and delete from Triage
         const newFileHandle = await periodFolder.getFileHandle(newFileName, { create: true });
         const writable = await newFileHandle.createWritable();
         await writable.write(await file.arrayBuffer());

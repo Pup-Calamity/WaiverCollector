@@ -38,21 +38,28 @@ function getWaiverRoutingInfo(jobId, vendorId, targetMonth, targetYear, endingDa
     const cleanVendorName = vendorName.replace(/[^a-zA-Z0-9 -]/g, "").trim() || vendorId;
     
     // Format dates for file naming
-    const waiverYear = String(endingDay.getFullYear()).slice(-2);
+    const waiverYear4 = String(endingDay.getFullYear());
+    const waiverYear2 = waiverYear4.slice(-2);
     const formattedWaiverMonth = String(endingDay.getMonth() + 1).padStart(2, '0');    
-    const folderMonth = String(targetMonth).padStart(2, '0');
     
-    const periodFolderName = `${folderMonth}-${targetYear}`;
+    // Use the actual Waiver Date for the folder, not the Pay App date
+    const periodFolderName = `${formattedWaiverMonth}-${waiverYear4}`;
     
     // Creates the base name: JobID-MMYY_VendorName
-    const baseFileName = `${jobId}-${formattedWaiverMonth}${waiverYear}_${cleanVendorName}`;
+    const baseFileName = `${jobId}-${formattedWaiverMonth}${waiverYear2}_${cleanVendorName}`;
+
+    // Look up BURG
+    const jobInfo = window.Workspace.appData.jobInfo || [];
+    const jobData = jobInfo.find(j => String(j["Job ID"]).trim().toLowerCase() === String(jobId).trim().toLowerCase()) || {};
+    const burgName = String(jobData["BURG Name"] || "Unknown Burg").trim().replace(/[^a-zA-Z0-9 -]/g, "");
 
     return {
         vendorName,
+        burgName, 
         periodFolderName,
         reqFileName: `${baseFileName}_${typeLabel}_req.pdf`,
         recFileName: `${baseFileName}_${typeLabel}_rec.pdf`,
-        emailFileName: baseFileName // Just the base name, omitting TYPE and req!
+        emailFileName: baseFileName 
     };
 }
 
@@ -348,7 +355,17 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
                 const newPdfBytes = await stampWaiverWithConfig(pdfBuffer, mappingData, configJson);
                 
                 const waiversBase = await window.Workspace.dirHandle.getDirectoryHandle("Waivers", { create: true });
-                const jobFolder = await waiversBase.getDirectoryHandle(jobId, { create: true });
+                
+                let burgFolder = null;
+                for await (const entry of waiversBase.values()) {
+                    if (entry.kind === 'directory' && entry.name.toLowerCase().includes(routing.burgName.toLowerCase())) {
+                        burgFolder = await waiversBase.getDirectoryHandle(entry.name);
+                        break;
+                    }
+                }
+                if (!burgFolder) burgFolder = await waiversBase.getDirectoryHandle(routing.burgName, { create: true });
+
+                const jobFolder = await burgFolder.getDirectoryHandle(jobId, { create: true });
                 targetWaiverFolder = await jobFolder.getDirectoryHandle(routing.periodFolderName, { create: true });
                 
                 const writablePdf = await (await targetWaiverFolder.getFileHandle(routing.reqFileName, { create: true })).createWritable();
@@ -448,7 +465,20 @@ window.processReturnedWaivers = async function(waiverIds) {
             finalVendorNameDisplay = routing.vendorName;
 
             try {
-                const dir = await (await (await window.Workspace.dirHandle.getDirectoryHandle("Waivers")).getDirectoryHandle(job)).getDirectoryHandle(routing.periodFolderName);
+                try {
+                const waiversBase = await window.Workspace.dirHandle.getDirectoryHandle("Waivers");
+                
+                let burgFolder = null;
+                for await (const entry of waiversBase.values()) {
+                    if (entry.kind === 'directory' && entry.name.toLowerCase().includes(routing.burgName.toLowerCase())) {
+                        burgFolder = await waiversBase.getDirectoryHandle(entry.name);
+                        break;
+                    }
+                }
+                if (!burgFolder) burgFolder = await waiversBase.getDirectoryHandle(routing.burgName); // Fallback lookup
+                
+                const jobDir = await burgFolder.getDirectoryHandle(job);
+                const dir = await jobDir.getDirectoryHandle(routing.periodFolderName);
                 
                 while (true) {
                     try { 
