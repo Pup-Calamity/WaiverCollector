@@ -86,21 +86,21 @@ async function sweepInboxToTriage() {
                     const parts = qrRawValue.split(' ');
                     // Example: ["21587", "0000036046", "012027", "|122026", "UNCOND"]
                     
-                    row["Extracted Job ID"] = parts[0];
-                    row["Extracted Vendor ID"] = parts[1].replace(/^0+/, '');
-                    
-                    row["Pay App Month"] = parts[2].substring(0, 2);
-                    row["Pay App Year"] = parts[2].substring(2, 6);
-                    
-                    const wDate = parts[3].replace('|', '');
-                    row["WaiverMonth"] = wDate.substring(0, 2);
-                    row["WaiverYear"] = wDate.substring(2, 6);
-                    
-                    row["Waiver Type"] = parts[4] || "";
-                    row["Status"] = "Pending Review";
-                } else {
-                    row["Status"] = "Pending Review (Manual)";
-                }
+                        row["Job ID"] = parts[0];
+                        row["Vendor ID"] = parts[1].replace(/^0+/, '');
+                        
+                        row["Pay App Month"] = parts[2].substring(0, 2);
+                        row["Pay App Year"] = parts[2].substring(2, 6);
+                        
+                        const wDate = parts[3].replace('|', '');
+                        row["Waiver Month"] = wDate.substring(0, 2);
+                        row["Waiver Year"] = wDate.substring(2, 6);
+                        
+                        row["Waiver Type"] = parts[4] || "";
+                        row["Status"] = "Pending Review";
+                    } else {
+                        row["Status"] = "Pending Review (Manual)";
+                    }
 
                 const newFileHandle = await triageFolder.getFileHandle(entry.name, { create: true });
                 const writable = await newFileHandle.createWritable();
