@@ -92,8 +92,13 @@ window.stampWaiverWithConfig = async function(pdfArrayBuffer, vendorData, config
 
                 // --- RENDERING PHASE ---
                 if (isBarcode) {
-                    // Generate High Error-Correction QR Code using window.QRCode explicitly
-                    const qrDataUrl = await window.QRCode.toDataURL(textToPrint, { 
+                    // Safe lookup supporting multiple global CDN export names
+                    const qrLib = window.QRCode || window.qrcode;
+                    if (!qrLib || typeof qrLib.toDataURL !== 'function') {
+                        throw new Error("QR Code library is not loaded or missing toDataURL method.");
+                    }
+
+                    const qrDataUrl = await qrLib.toDataURL(textToPrint, { 
                         errorCorrectionLevel: 'H',
                         margin: 1,
                         width: 150 
