@@ -23,7 +23,10 @@ window.Workspace = {
         WIP: [],
         noticeTracker: [],
         jobNotes: [],
-        billingTracker: []
+        billingTracker: [],
+        WaiverReviewQueue: [],
+        WaiverEmails: [],
+        BurgList: []
     }
 };
 
@@ -45,7 +48,10 @@ window.WORKSPACE_FILE_PATHS = {
     noticeTracker: "Data/MainData/Prelim Tracker.xlsx",
     billingTracker: "Data/MainData/Billing Checklist.xlsx",
     jobNotes: "Data/MainData/Job Notes.xlsx",
-    waiverInvoices: "Data/DailyUpdateData/Waiver Invoices.xlsx"
+    waiverInvoices: "Data/DailyUpdateData/Waiver Invoices.xlsx",
+    WaiverReviewQueue: "Data/MainData/WaiverReviewQueue.xlsx",
+    WaiverEmails: "Data/MainData/Waiver Emails.xlsx",
+    BurgList: "Data/MainData/Burg Emails.xlsx"
 };
 // --- Native Database Setup (IndexedDB for remembering the folder) ---
 const dbPromise = new Promise((resolve, reject) => {

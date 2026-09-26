@@ -94,13 +94,21 @@ window.stampWaiverWithConfig = async function(pdfArrayBuffer, vendorData, config
 
                 // --- RENDERING PHASE ---
                 if (isBarcode) {
-                    targetPage.drawText(textToPrint, {
+                    // Generate High Error-Correction QR Code
+                    const qrDataUrl = await QRCode.toDataURL(textToPrint, { 
+                        errorCorrectionLevel: 'H',
+                        margin: 1,
+                        width: 150 
+                    });
+                    
+                    const qrImage = await pdfDoc.embedPng(qrDataUrl);
+                    const boxSize = field.width || 50; 
+                    
+                    targetPage.drawImage(qrImage, {
                         x: field.x,
                         y: field.y,
-                        size: finalFontSize,
-                        font: font,
-                        color: rgb(0, 0, 0),
-                        rotate: degrees(90)
+                        width: boxSize,
+                        height: boxSize
                     });
                 } 
                 else if (isBoxed) {
