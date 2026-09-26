@@ -157,8 +157,8 @@ function renderQueueList() {
             <div style="font-weight: bold; color: var(--text-main); margin-bottom: 5px;">${item["File Name"] || "Unknown Document"}</div>
             <div style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 3px;">Sender: ${item["Sender Email"] || "-"}</div>
             <div style="font-size: 0.85em; color: var(--text-muted);">
-                <span style="background: #e2e8f0; color: #334155; padding: 2px 6px; border-radius: 4px; font-family: monospace;">J: ${item["Extracted Job ID"] || "-"}</span>
-                <span style="background: #e2e8f0; color: #334155; padding: 2px 6px; border-radius: 4px; font-family: monospace;">V: ${item["Extracted Vendor ID"] || "-"}</span>
+                <span style="background: #e2e8f0; color: #334155; padding: 2px 6px; border-radius: 4px; font-family: monospace;">J: ${item["Job ID"] || "-"}</span>
+                <span style="background: #e2e8f0; color: #334155; padding: 2px 6px; border-radius: 4px; font-family: monospace;">V: ${item["Vendor ID"] || "-"}</span>
                 <span style="background: #fef08a; color: #854d0e; padding: 2px 6px; border-radius: 4px; font-family: monospace; margin-left: 5px;">${item["Waiver Type"] || "Type"}</span>
             </div>
         `;
@@ -172,13 +172,13 @@ function renderQueueList() {
 async function loadQueueItem(item) {
     activeQueueItem = item;
     
-    document.getElementById('aqJobId').value = item["Extracted Job ID"] || "";
-    document.getElementById('aqVendorId').value = item["Extracted Vendor ID"] || "";
+    document.getElementById('aqJobId').value = item["Job ID"] || "";
+    document.getElementById('aqVendorId').value = item["Vendor ID"] || "";
     document.getElementById('aqType').value = item["Waiver Type"] || "";
     document.getElementById('aqPayAppMonth').value = item["Pay App Month"] || "";
     document.getElementById('aqPayAppYear').value = item["Pay App Year"] || "";
-    document.getElementById('aqWaiverMonth').value = item["WaiverMonth"] || "";
-    document.getElementById('aqWaiverYear').value = item["WaiverYear"] || "";
+    document.getElementById('aqWaiverMonth').value = item["Waiver Month"] || "";
+    document.getElementById('aqWaiverYear').value = item["Waiver Year"] || "";
 
     const frame = document.getElementById('aqPdfFrame');
     frame.src = "about:blank"; // Clear the frame while the new file loads
