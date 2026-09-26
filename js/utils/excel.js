@@ -135,40 +135,36 @@ async function UpdateExcel(fileHandle, changedRows, uniqueIdKey, sheetName = "Sh
     }
 }
 
-// Prepare Excel Data for Upload (ExcelJS Surgical Update)
+// Prepare Excel Data for Upload (Safe XML Injection)
 async function UpdateExcel(fileHandle, changedRows, uniqueIdKey, sheetName = "Sheet1") {
     try {
-        console.log("Surgically updating Excel cells to preserve Tables...");
+        console.log("Using XlsxPopulate to safely inject cell data...");
 
         const file = await fileHandle.getFile();
         const buffer = await file.arrayBuffer();
 
-        const workbook = new window.ExcelJS.Workbook();
-        await workbook.xlsx.load(buffer);
+        // 1. Load the workbook (This library preserves the original XML verbatim)
+        const workbook = await window.XlsxPopulate.fromDataAsync(buffer);
+        
+        // 2. Find the sheet
+        let sheet = workbook.sheet(sheetName);
+        if (!sheet) sheet = workbook.sheet(0); // Fallback to first sheet
 
-        // --- ANTI-CORRUPTION FIX 1: Delete Calculation Chain ---
-        // Forces Excel to rebuild its formula map on next open so it doesn't crash
-        delete workbook.calcProperties;
-
-        let worksheet = workbook.getWorksheet(sheetName);
-        if (!worksheet) worksheet = workbook.worksheets[0];
-
-        // --- ANTI-CORRUPTION FIX 2: Safe Header Parsing ---
-        // Prevents rich-text formatting from hiding header names
-        const headerRow = worksheet.getRow(1);
+        // 3. Map the exact column headers
         const headers = {};
-        headerRow.eachCell((cell, colNumber) => {
-            let cellVal = cell.value;
-            if (cellVal && typeof cellVal === 'object' && cellVal.richText) {
-                cellVal = cellVal.richText.map(t => t.text).join('');
-            }
-            if (cellVal) headers[String(cellVal).trim()] = colNumber;
-        });
-
-        if (!headers[uniqueIdKey]) {
-            throw new Error(`Unique ID column "${uniqueIdKey}" not found. Found: ${Object.keys(headers).join(', ')}`);
+        let colNum = 1;
+        while (colNum <= 100) { // Scan up to 100 columns for headers
+            const cellVal = sheet.cell(1, colNum).value();
+            if (cellVal === undefined || cellVal === null || cellVal === "") break;
+            headers[String(cellVal).trim()] = colNum;
+            colNum++;
         }
 
+        if (!headers[uniqueIdKey]) {
+            throw new Error(`Unique ID column "${uniqueIdKey}" not found.`);
+        }
+
+        // --- Audit Trail Setup ---
         const activeUser = window.Workspace.currentUser || "Unknown User";
         const now = new Date();
         const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -177,6 +173,7 @@ async function UpdateExcel(fileHandle, changedRows, uniqueIdKey, sheetName = "Sh
         const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const timestampString = `${mm}/${dd}/${yyyy} ${timeString}`;
 
+        // 4. Process changes row by row
         changedRows.forEach(changedRow => {
             changedRow["Last Updated"] = timestampString;
             changedRow["Updated By"] = activeUser;
@@ -184,49 +181,46 @@ async function UpdateExcel(fileHandle, changedRows, uniqueIdKey, sheetName = "Sh
             const targetId = String(changedRow[uniqueIdKey]).trim();
             let rowIndexToUpdate = -1;
 
-            // --- ANTI-CORRUPTION FIX 3: Bulletproof ID Matching ---
+            // Scan the ID column to find which row to update
             const idCol = headers[uniqueIdKey];
-            worksheet.getColumn(idCol).eachCell((cell, rowNum) => {
-                if (rowNum > 1) {
-                    let cellVal = cell.value;
-                    if (cellVal && typeof cellVal === 'object' && cellVal.richText) {
-                        cellVal = cellVal.richText.map(t => t.text).join('');
-                    } else if (cellVal && typeof cellVal === 'object' && cellVal.result) {
-                        cellVal = cellVal.result; // Handle formula results
-                    }
-                    
-                    if (String(cellVal).trim() === targetId) {
-                        rowIndexToUpdate = rowNum;
-                    }
+            let searchRow = 2;
+            
+            while (searchRow < 2000) { // Safe limit to prevent infinite loops
+                const cellVal = sheet.cell(searchRow, idCol).value();
+                if (String(cellVal).trim() === targetId) {
+                    rowIndexToUpdate = searchRow;
+                    break;
                 }
-            });
+                searchRow++;
+            }
 
             if (rowIndexToUpdate !== -1) {
-                // UPDATE EXISTING ROW (Safe for Tables)
-                const excelRow = worksheet.getRow(rowIndexToUpdate);
+                // UPDATE EXISTING ROW
                 for (const [key, val] of Object.entries(changedRow)) {
                     if (headers[key]) {
-                        excelRow.getCell(headers[key]).value = val;
+                        sheet.cell(rowIndexToUpdate, headers[key]).value(val);
                     }
                 }
-                excelRow.commit();
             } else {
-                // APPEND NEW ROW (Only triggers if ID is genuinely missing)
-                const newRowObj = [];
-                for (const [key, colNum] of Object.entries(headers)) {
-                    newRowObj[colNum] = changedRow[key] !== undefined ? changedRow[key] : "";
+                // APPEND NEW ROW (Find the first completely blank row)
+                let emptyRow = 2;
+                while (sheet.cell(emptyRow, idCol).value() !== undefined && sheet.cell(emptyRow, idCol).value() !== null) {
+                    emptyRow++;
                 }
-                worksheet.addRow(newRowObj).commit();
+                for (const [key, colNumber] of Object.entries(headers)) {
+                    const val = changedRow[key] !== undefined ? changedRow[key] : "";
+                    sheet.cell(emptyRow, colNumber).value(val);
+                }
             }
         });
 
-        // Write the clean, uncorrupted buffer back to disk
-        const outBuffer = await workbook.xlsx.writeBuffer();
+        // 5. Output the buffer and overwrite the file
+        const outBuffer = await workbook.outputAsync();
         const writableStream = await fileHandle.createWritable();
         await writableStream.write(outBuffer);
         await writableStream.close();
 
-        console.log("✅ Cells updated successfully. Table & column structure fully preserved!");
+        console.log("✅ Cells injected successfully. Tables and AutoFilters left untouched!");
     } catch (error) {
         console.error("Failed to update Excel:", error);
     }

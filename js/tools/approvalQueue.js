@@ -90,16 +90,11 @@ async function sweepInboxToTriage() {
                     
                     row["Job ID"] = parts[0] || "";
                     row["Vendor ID"] = parts[1] ? parts[1].replace(/^0+/, '') : "";
-                    
-                    const payAppRaw = parts[2] || "";
-                    row["Pay App Month"] = payAppRaw.substring(0, 2);
-                    row["Pay App Year"] = payAppRaw.substring(2, 6);
-                    
-                    const wDateRaw = (parts[3] || "").replace('|', '');
-                    row["Waiver Month"] = wDateRaw.substring(0, 2);
-                    row["Waiver Year"] = wDateRaw.substring(2, 6);
-                    
-                    row["Waiver Type"] = parts[4] || "";
+                    row["Pay App Month"] =  parts[2] || "";
+                    row["Pay App Year"] = parts[3] || "";
+                    row["Waiver Month"] = (parts[4] || "").replace('|', '');
+                    row["Waiver Year"] = parts[5] || "";
+                    row["Waiver Type"] = parts[6] || "";
                     row["Status"] = "Pending Review";
                 } else {
                     row["Status"] = "Pending Review (Manual)";
