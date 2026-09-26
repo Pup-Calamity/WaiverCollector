@@ -60,14 +60,14 @@ function getWaiverRoutingInfo(jobId, vendorId, targetMonth, targetYear, endingDa
 // 2. DATA PREP & VALIDATION
 // ==========================================
 
-function prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, customThroughPeriod, customDueDate, waiverMonthInt) {
+function prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, customThroughPeriod, customDueDate, customWaiverMonth) {
     return {
         "Waiver ID": generateWaiverKey(jobId, vendorId, targetMonth, targetYear), 
         "Job ID": jobId,
         "Vendor ID": vendorId,
         "Month": targetMonth,
         "Year": targetYear,
-        "Waiver Month": waiverMonthInt || "",        
+        "Waiver Month": customWaiverMonth || "",        
         "Through Period": customThroughPeriod || "", 
         "Status": "Pending",
         "Sent Date": "", 
@@ -296,14 +296,16 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
                 
                 let payAppM = String(targetMonth).trim().padStart(2, '0');
                 let payAppY = String(targetYear).trim();
-                let wvrM = String(waiverMonthInt).trim().padStart(2, '0');
+                
+                let wvrM = String(record["Waiver Month"] || waiverMonthInt).trim().padStart(2, '0');
                 let wvrY = payAppY;
 
                 if (payAppM === "01" && wvrM === "12") {
                     wvrY = String(parseInt(payAppY) - 1);
                 }
 
-                const formattedBarcode = `${jobId} ${vendorId.padStart(10, '0')} ${payAppM} ${payAppY} |${wvrM} ${wvrY} ${typeLabel}`;
+                // Look how clean this is! Example: "215870000036046012027-1 12 2026 COND"
+                const formattedBarcode = `${record["Waiver ID"]} ${wvrM} ${wvrY} ${typeLabel}`;
 
                 const mappingData = {
                     "amount": finalAmount, "amountWords": WaiverMath.spellNumber(finalAmount),
@@ -491,3 +493,93 @@ window.processReturnedWaivers = async function(waiverIds) {
         alert(`Successfully marked ${count} draw(s) as Received!`);
     }
 };
+
+// ==========================================
+// 4. CUSTOM WAIVER MODAL UI
+// ==========================================
+
+window.addEventListener('DOMContentLoaded', () => {
+    const modal = document.getElementById('customWaiverModal');
+    const openModalBtn = document.getElementById('openCustomWaiverBtn');
+    const cancelModalBtn = document.getElementById('cancelCustomWaiverBtn');
+    const saveModalBtn = document.getElementById('saveCustomWaiverBtn');
+
+    if (openModalBtn) {
+        openModalBtn.addEventListener('click', () => {
+            document.getElementById('cwMonth').value = new Date().getMonth() + 1;
+            document.getElementById('cwYear').value = new Date().getFullYear();
+            if (modal) modal.style.display = 'flex';
+        });
+    }
+
+    if (cancelModalBtn) {
+        cancelModalBtn.addEventListener('click', () => {
+            if (modal) modal.style.display = 'none';
+        });
+    }
+
+    if (saveModalBtn) {
+        saveModalBtn.addEventListener('click', async () => {
+            const jobId = document.getElementById('cwJobId').value.trim();
+            const vendorId = document.getElementById('cwVendorId').value.trim();
+            const targetMonth = document.getElementById('cwMonth').value;
+            const targetYear = document.getElementById('cwYear').value;
+            
+            let customThrough = document.getElementById('cwThrough').value.trim();
+            let customDue = document.getElementById('cwDue').value.trim();
+
+            if (!jobId || !vendorId) return alert("Job ID and Vendor ID are required!");
+
+            saveModalBtn.textContent = "Saving...";
+            saveModalBtn.disabled = true;
+
+            try {
+                // 1. Grab settings for this specific job
+                const jobSettings = window.Workspace.appData.jobNotes?.find(j => String(j["Job ID"]).trim().toLowerCase() === jobId.toLowerCase()) || {};
+                
+                // 2. Route through the superior Date Engine
+                const { startDay, endingDay, waiverMonthInt } = calculatePeriodDates(targetMonth, targetYear, "trailing", jobSettings["Through Day"] || 31);
+                
+                // If user didn't type a custom through period, use the mathematically correct one
+                if (!customThrough) {
+                    customThrough = `${startDay.toLocaleDateString()} to ${endingDay.toLocaleDateString()}`;
+                }
+
+                // If user didn't type a due date, calculate it automatically (e.g. 25th of next month)
+                if (!customDue) {
+                    const dueDay = parseInt(jobSettings["Due Day"]) || 25;
+                    // JS months are 0-indexed, so passing targetMonth pushes it safely into the next month
+                    customDue = new Date(targetYear, parseInt(targetMonth), dueDay).toLocaleDateString();
+                }
+
+                // 3. Generate the record and save to Excel
+                const newRow = prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, customThrough, customDue, waiverMonthInt);
+                
+                const fileHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.waivers);
+                await UpdateExcel(fileHandle, [newRow], "Waiver ID", "Waivers"); 
+
+                // 4. Update the live memory & UI
+                if (!window.Workspace.appData.waivers) window.Workspace.appData.waivers = [];
+                window.Workspace.appData.waivers.push(newRow);
+                
+                if (typeof populateYearFilter === "function") populateYearFilter();
+                if (typeof renderWaiverTable === "function") renderWaiverTable();
+
+                if (modal) modal.style.display = 'none';
+                
+                // Clear the inputs for next time
+                document.getElementById('cwJobId').value = '';
+                document.getElementById('cwVendorId').value = '';
+                document.getElementById('cwThrough').value = '';
+                document.getElementById('cwDue').value = '';
+
+            } catch (error) {
+                console.error("Failed to generate custom waiver:", error);
+                alert("Error saving waiver. Check console.");
+            } finally {
+                saveModalBtn.textContent = "Generate & Save";
+                saveModalBtn.disabled = false;
+            }
+        });
+    }
+});

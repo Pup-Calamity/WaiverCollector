@@ -18,6 +18,11 @@ window.addEventListener('DOMContentLoaded', () => {
             launchBtn.innerHTML = originalText;
             switchView('approvalQueueView');
             renderQueueList();
+
+            document.getElementById('jobLookupBtn')?.addEventListener('click', () => openLookupModal('job'));
+            document.getElementById('vendorLookupBtn')?.addEventListener('click', () => openLookupModal('vendor'));
+            document.getElementById('closeLookupBtn')?.addEventListener('click', () => document.getElementById('lookupModal').close());
+            document.getElementById('lookupSearchInput')?.addEventListener('input', performLookupSearch);
         });
     }
 
@@ -88,13 +93,29 @@ async function sweepInboxToTriage() {
                     const parts = qrRawValue.split(' ');
                     console.log("✂️ [QR Debug] Split parts array:", parts);
                     
-                    row["Job ID"] = parts[0] || "";
-                    row["Vendor ID"] = parts[1] ? parts[1].replace(/^0+/, '') : "";
-                    row["Pay App Month"] =  parts[2] || "";
-                    row["Pay App Year"] = parts[3] || "";
-                    row["Waiver Month"] = (parts[4] || "").replace('|', '');
-                    row["Waiver Year"] = parts[5] || "";
-                    row["Waiver Type"] = parts[6] || "";
+                    // 1. Grab the 4 pieces from the QR Code
+                    const scannedWaiverId = parts[0] || "";
+                    row["Waiver ID"]      = scannedWaiverId;
+                    row["Waiver Month"]   = parts[1] || "";
+                    row["Waiver Year"]    = parts[2] || "";
+                    row["Waiver Type"]    = parts[3] || "";
+                    
+                    // 2. Look up the matching record in the Master Waivers memory
+                    const masterWaivers = window.Workspace.appData.waivers || [];
+                    const masterRow = masterWaivers.find(w => String(w["Waiver ID"]).trim() === scannedWaiverId);
+                    
+                    // 3. Populate the queue UI directly from the true master data
+                    if (masterRow) {
+                        row["Job ID"]        = masterRow["Job ID"] || "";
+                        row["Vendor ID"]     = masterRow["Vendor ID"] || "";
+                        row["Pay App Month"] = masterRow["Month"] || "";
+                        row["Pay App Year"]  = masterRow["Year"] || "";
+                    } else {
+                        console.warn(`⚠️ [QR Debug] Waiver ID ${scannedWaiverId} not found in Master Tracker!`);
+                        row["Job ID"]        = "UNKNOWN";
+                        row["Vendor ID"]     = "UNKNOWN";
+                    }
+                    
                     row["Status"] = "Pending Review";
                 } else {
                     row["Status"] = "Pending Review (Manual)";
@@ -178,26 +199,35 @@ async function loadQueueItem(item) {
     document.getElementById('aqPayAppMonth').value = item["Pay App Month"] || "";
     document.getElementById('aqPayAppYear').value = item["Pay App Year"] || "";
     document.getElementById('aqWaiverMonth').value = item["Waiver Month"] || "";
-    document.getElementById('aqWaiverYear').value = item["Waiver Year"] || "";
+    
+    // Set Scan Status Banner
+    const statusBanner = document.getElementById('aqScanStatus');
+    if (item["Status"] === "Pending Review (Manual)") {
+        statusBanner.style.background = "#fee2e2";
+        statusBanner.style.color = "#b91c1c";
+        statusBanner.innerHTML = "⚠️ QR Code unreadable or missing. Please type data in manually.";
+    } else {
+        statusBanner.style.background = "#dcfce7";
+        statusBanner.style.color = "#15803d";
+        statusBanner.innerHTML = "✅ QR Scanned Successfully! Verify the boxes below match the PDF.";
+    }
+
+    // Translate the IDs to names and check for custom flags
+    updateQueueContextDisplay();
 
     const frame = document.getElementById('aqPdfFrame');
     frame.src = "about:blank"; // Clear the frame while the new file loads
 
     try {
-        // 1. Navigate to the Triage folder where the physical file lives
         const baseFolder = await getAttachmentsBaseFolder();
         const triageFolder = await baseFolder.getDirectoryHandle('Waivers_2_Triage');
-        
-        // 2. Grab the actual file
         const fileHandle = await triageFolder.getFileHandle(item["File Name"]);
         const file = await fileHandle.getFile();
         
-        // 3. Create a temporary, secure browser URL and display it
         const fileURL = URL.createObjectURL(file);
         frame.src = fileURL;
-        
     } catch (error) {
-        console.warn("Could not load preview. The file might be missing from Triage.", error);
+        console.warn("Could not load preview.", error);
         frame.src = "about:blank"; 
     }
 
@@ -215,7 +245,22 @@ function clearSelection() {
     document.getElementById('aqPayAppMonth').value = "";
     document.getElementById('aqPayAppYear').value = "";
     document.getElementById('aqWaiverMonth').value = "";
-    document.getElementById('aqWaiverYear').value = "";
+    
+    // Clear Context Labels
+    const statusBanner = document.getElementById('aqScanStatus');
+    if (statusBanner) { statusBanner.style.background = "transparent"; statusBanner.innerHTML = ""; }
+    
+    const throughDisplay = document.getElementById('aqThroughPeriodDisplay');
+    if (throughDisplay) throughDisplay.innerHTML = "";
+    
+    const badgeDiv = document.getElementById('aqContextBadge');
+    if (badgeDiv) badgeDiv.innerHTML = "";
+    
+    const jobName = document.getElementById('aqJobNameDisplay');
+    if (jobName) jobName.textContent = "-";
+    
+    const venName = document.getElementById('aqVendorNameDisplay');
+    if (venName) venName.textContent = "-";
     
     document.getElementById('aqPdfFrame').src = "about:blank";
     document.getElementById('aqApproveBtn').disabled = true;
@@ -369,5 +414,127 @@ async function routeFileLocally(fileName, targetJob, vendorId, waiverMonth, waiv
     } catch (error) {
         console.warn("Local file routing failed.", error);
         throw new Error("Could not move the PDF locally. Ensure Waivers_2_Triage is accessible. " + error.message);
+    }
+}
+
+// --- Context UI Helper ---
+function updateQueueContextDisplay() {
+    const jobId = document.getElementById('aqJobId').value.trim();
+    const vendorId = document.getElementById('aqVendorId').value.trim();
+    
+    let jobName = "Unknown Job";
+    let vendorName = "Unknown Vendor";
+
+    try {
+        if (window.WaiverMath) {
+            jobName = window.WaiverMath.getEmailInfo(jobId, vendorId, "Job Name") || "Unknown Job";
+            vendorName = window.WaiverMath.getEmailInfo(jobId, vendorId, "Vendor Name") || "Unknown Vendor";
+        }
+    } catch(e) {}
+
+    // 1. Update the plain English names under the boxes
+    document.getElementById('aqJobNameDisplay').textContent = jobName;
+    document.getElementById('aqVendorNameDisplay').textContent = vendorName;
+
+    // 2. Fetch the Master Record to show the Through Date and Custom Flags
+    const waiverId = activeQueueItem ? activeQueueItem["Waiver ID"] : "";
+    const masterRow = (window.Workspace.appData.waivers || []).find(w => String(w["Waiver ID"]).trim() === waiverId);
+    
+    const throughDisplay = document.getElementById('aqThroughPeriodDisplay');
+    const badgeDiv = document.getElementById('aqContextBadge');
+
+    if (masterRow) {
+        throughDisplay.innerHTML = `<strong>PDF Should Say Through:</strong> <span style="color: var(--text-main);">${masterRow["Through Period"] || "Unknown"}</span>`;
+        
+        const isCustom = waiverId.match(/-([2-9]|\d{2,})$/); 
+        if (isCustom) {
+            badgeDiv.innerHTML = `<span style="background: #fef08a; color: #854d0e; padding: 3px 6px; border-radius: 4px;">⚠️ Custom Waiver</span>`;
+        } else {
+            badgeDiv.innerHTML = `<span style="background: #e2e8f0; color: #334155; padding: 3px 6px; border-radius: 4px;">Standard Period</span>`;
+        }
+    } else {
+        throughDisplay.innerHTML = "";
+        badgeDiv.innerHTML = "";
+    }
+}
+
+// --- 7. Search / Lookup Engine ---
+let currentLookupMode = null;
+
+function openLookupModal(mode) {
+    currentLookupMode = mode;
+    const modal = document.getElementById('lookupModal');
+    const title = document.getElementById('lookupTitle');
+    const input = document.getElementById('lookupSearchInput');
+    
+    title.innerHTML = mode === 'job' ? '🔍 Lookup Job' : '🔍 Lookup Vendor';
+    input.value = '';
+    
+    performLookupSearch(); // Show initial unfiltered list
+    modal.showModal();
+    input.focus();
+}
+
+function performLookupSearch() {
+    const searchTerm = document.getElementById('lookupSearchInput').value.toLowerCase().trim();
+    const resultsContainer = document.getElementById('lookupResults');
+    resultsContainer.innerHTML = '';
+
+    let data = [];
+    let idKey = '';
+    let nameKey = '';
+
+    if (currentLookupMode === 'job') {
+        data = window.Workspace.appData.jobInfo || [];
+        idKey = 'Job ID';
+        nameKey = 'Job Name';
+    } else {
+        data = window.Workspace.appData.vendorInfo || [];
+        idKey = 'Vendor ID';
+        nameKey = 'Vendor Name';
+    }
+
+    let matchCount = 0;
+    
+    for (const row of data) {
+        const idVal = String(row[idKey] || '').toLowerCase();
+        const nameVal = String(row[nameKey] || '').toLowerCase();
+
+        // Search logic: matches if input is empty, or if text exists in ID or Name
+        if (!searchTerm || idVal.includes(searchTerm) || nameVal.includes(searchTerm)) {
+            const div = document.createElement('div');
+            div.style.cssText = `padding: 10px 15px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;`;
+            div.onmouseover = () => div.style.background = 'var(--surface-color)';
+            div.onmouseout = () => div.style.background = 'transparent';
+            
+            div.innerHTML = `
+                <div style="font-weight: bold; color: var(--text-main);">${row[idKey] || 'N/A'}</div>
+                <div style="font-size: 0.85em; color: var(--text-muted);">${row[nameKey] || 'Unknown Name'}</div>
+            `;
+            
+            // When clicked, auto-fill the target box and trigger the UI context update
+            div.onclick = () => {
+                if (currentLookupMode === 'job') {
+                    document.getElementById('aqJobId').value = row[idKey];
+                } else {
+                    document.getElementById('aqVendorId').value = row[idKey];
+                }
+                
+                // Immediately update the English names underneath the inputs!
+                if (typeof updateQueueContextDisplay === 'function') updateQueueContextDisplay();
+                
+                document.getElementById('lookupModal').close();
+            };
+
+            resultsContainer.appendChild(div);
+            matchCount++;
+            
+            // Cap at 50 results to keep the UI lightning fast
+            if (matchCount >= 50) break;
+        }
+    }
+
+    if (matchCount === 0) {
+        resultsContainer.innerHTML = `<div style="padding: 15px; text-align: center; color: var(--text-muted);">No results found.</div>`;
     }
 }

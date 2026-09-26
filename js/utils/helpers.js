@@ -60,43 +60,6 @@ function getBurgEmail(burgName, roleName) {
     return "";
 }
 
-// --- Date Utilities ---
-function getTodayString() {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    return `${mm}.${dd}.${yyyy}`;
-}
-
-function calculateWaiverDates(targetMonth, targetYear, dueDayOffset, throughDay) {
-    const monthIndex = parseInt(targetMonth) - 1; 
-    const endOfTargetMonth = new Date(targetYear, monthIndex + 1, 0);
-    const daysToAdd = dueDayOffset ? parseInt(dueDayOffset) : 45;
-    
-    const dueDate = new Date(endOfTargetMonth);
-    dueDate.setDate(dueDate.getDate() + daysToAdd);
-    const dueDateStr = dueDate.toLocaleDateString();
-
-    let throughPeriodStr = "";
-    if (throughDay) {
-        const tDay = parseInt(throughDay);
-        const periodEnd = new Date(targetYear, monthIndex, tDay);
-        const periodStart = new Date(targetYear, monthIndex - 1, tDay + 1);
-        
-        throughPeriodStr = `${periodStart.toLocaleDateString()} to ${periodEnd.toLocaleDateString()}`;
-    } else {
-        const periodStart = new Date(targetYear, monthIndex, 1);
-        const periodEnd = new Date(targetYear, monthIndex + 1, 0); 
-        
-        throughPeriodStr = `${periodStart.toLocaleDateString()} to ${periodEnd.toLocaleDateString()}`;
-    }
-
-    return {
-        dueDate: dueDateStr,
-        throughPeriod: throughPeriodStr
-    };
-}
 
 // --- File to Base64 Translator for Email Attachments ---
 window.fileToBase64 = async function(file) {

@@ -151,3 +151,74 @@ async function batchProcessQueueReminders(targetMonth, targetYear, logMsg, queue
 
     logMsg(`✅ Batch Complete! Generated ${emailCount} ${queueType === "REJECTED" ? "Rejected" : "Approval"} Reminders.`);
 }
+
+// --- Report: Missing Waiver Requests ---
+async function batchProcessInvoicesEmail(targetMonth, targetYear, logMsg = console.log) {
+    const waivers = window.Workspace.appData.waivers;
+    const invoices = window.Workspace.appData.invInProcessing;
+
+    if (!waivers || !invoices) {
+        logMsg("❌ Missing data in memory hub! Please sync.", true);
+        return;
+    }
+
+    const emailFolderHandle = await window.Workspace.dirHandle.getDirectoryHandle("Generated_Emails", { create: true });
+    const targetWaivers = waivers.filter(w => w["Month"] == targetMonth && w["Year"] == targetYear);
+    
+    logMsg(`🔍 Scanning for missing waivers for ${targetMonth}/${targetYear}...`);
+    let count = 0;
+
+    for (const waiver of targetWaivers) {
+        const jobId = String(waiver["Job ID"]).trim();
+        const vendorId = String(waiver["Vendor ID"]).trim();
+
+        const matchingInvoices = invoices.filter(inv => 
+            String(inv["jobid"]).trim().toLowerCase() === jobId.toLowerCase() &&
+            String(inv["vendorid"]).trim().toLowerCase() === vendorId.toLowerCase()
+        );
+
+        if (matchingInvoices.length > 0) {
+            let invoiceRowsHtml = "";
+            matchingInvoices.forEach(inv => {
+                const formattedAmount = Number(inv["Amount"]).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+                invoiceRowsHtml += `
+                    <tr>
+                        <td style="padding: 5px; border: 1px solid #ccc;">${inv["invoicenumb"] || ''}</td>
+                        <td style="padding: 5px; border: 1px solid #ccc;">${inv["invoicedate (Day-Month-Year)"] || ''}</td>
+                        <td style="padding: 5px; border: 1px solid #ccc;">${formattedAmount}</td>
+                    </tr>`;
+            });
+
+            const htmlBody = `
+                <div style="font-family: Calibri, sans-serif; font-size: 11pt;">
+                    <p>Hello,</p>
+                    <p>We are processing billing for <strong>Job: ${jobId}</strong>.</p>
+                    <p>Please provide a waiver for ${targetMonth}/${targetYear} to release the following invoices:</p>
+                    <table style="border-collapse: collapse; width: 100%; max-width: 500px; margin: 15px 0;">
+                        <tr style="background: #eee; text-align: left;">
+                            <th style="padding: 5px; border: 1px solid #ccc;">Invoice #</th>
+                            <th style="padding: 5px; border: 1px solid #ccc;">Date</th>
+                            <th style="padding: 5px; border: 1px solid #ccc;">Amount</th>
+                        </tr>
+                        ${invoiceRowsHtml}
+                    </table>
+                    <p>Thank you,</p>
+                </div>
+                ${typeof getEmailSignature === 'function' ? getEmailSignature() : ''}
+            `;
+
+            // Note: Ideally map the toEmail dynamically using WaiverMath in the future
+            const fileName = `WaiverRequest_${jobId}_${vendorId}`;
+            const toEmail = "vendor@example.com"; 
+            const ccEmail = "manager@yourcompany.com";
+            const subject = `Action Required: Lien Waiver for ${jobId}`;
+
+            const success = await generateEmailFile(emailFolderHandle, fileName, toEmail, ccEmail, subject, htmlBody);
+            if (success) {
+                logMsg(`✉️ Generated Request: ${fileName}.eml`);
+                count++;
+            }
+        }
+    }
+    logMsg(`✅ Successfully generated ${count} missing waiver requests!`);
+}

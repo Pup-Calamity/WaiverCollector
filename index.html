@@ -333,23 +333,39 @@
                 
                 <div class="card" style="padding: 20px; display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; margin: 0;">
                     <div style="flex: 1;">
-                        <!-- Row 1: Core IDs -->
+                        <!-- NEW: Scan Status Banner -->
+                        <div id="aqScanStatus" style="font-weight: bold; padding: 10px; margin-bottom: 15px; border-radius: 6px; text-align: center;"></div>
+                        
+                        <!-- NEW: Through Date Context Banner -->
+                        <div id="aqThroughPeriodDisplay" style="font-size: 0.9em; text-align: center; color: var(--text-muted); margin-bottom: 15px;"></div>
+
+                        <!-- Row 1: Core IDs (With Plain-English Name Labels & Lookup Buttons) -->
                         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
                             <div>
                                 <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Job ID</label>
-                                <input type="text" id="aqJobId" style="margin: 0; padding: 10px;" placeholder="e.g. 21587">
+                                <div style="display: flex; gap: 5px;">
+                                    <input type="text" id="aqJobId" style="margin: 0; padding: 10px; flex: 1; min-width: 0;" placeholder="e.g. 21587">
+                                    <button id="jobLookupBtn" title="Search Jobs" style="background: var(--surface-color); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px; padding: 0 10px; cursor: pointer; transition: 0.2s;">🔍</button>
+                                </div>
+                                <div id="aqJobNameDisplay" style="font-size: 0.75em; color: var(--brand-color); margin-top: 4px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">-</div>
                             </div>
                             <div>
                                 <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Vendor ID</label>
-                                <input type="text" id="aqVendorId" style="margin: 0; padding: 10px;" placeholder="e.g. 36046">
+                                <div style="display: flex; gap: 5px;">
+                                    <input type="text" id="aqVendorId" style="margin: 0; padding: 10px; flex: 1; min-width: 0;" placeholder="e.g. 36046">
+                                    <button id="vendorLookupBtn" title="Search Vendors" style="background: var(--surface-color); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px; padding: 0 10px; cursor: pointer; transition: 0.2s;">🔍</button>
+                                </div>
+                                <div id="aqVendorNameDisplay" style="font-size: 0.75em; color: var(--brand-color); margin-top: 4px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">-</div>
                             </div>
                             <div>
                                 <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Waiver Type</label>
                                 <input type="text" id="aqType" style="margin: 0; padding: 10px;" placeholder="e.g. COND">
+                                <div id="aqContextBadge" style="font-size: 0.75em; margin-top: 4px; font-weight: bold;"></div>
                             </div>
                         </div>
+                        
                         <!-- Row 2: Date Splitting -->
-                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
                             <div>
                                 <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Pay App Month</label>
                                 <input type="text" id="aqPayAppMonth" style="margin: 0; padding: 10px;" placeholder="01">
@@ -362,10 +378,6 @@
                                 <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Waiver Month</label>
                                 <input type="text" id="aqWaiverMonth" style="margin: 0; padding: 10px;" placeholder="12">
                             </div>
-                            <div>
-                                <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Waiver Year</label>
-                                <input type="text" id="aqWaiverYear" style="margin: 0; padding: 10px;" placeholder="2026">
-                            </div>
                         </div>
                     </div>
                     
@@ -377,6 +389,8 @@
             </div>
         </div>
     </div>
+
+    
 
     <!-- VIEW 6: Visual Template Mapper -->
     <div id="templateMapperView" class="view-section hub-section">
@@ -489,23 +503,27 @@
         </div>
     </dialog>
 
-    <!-- One Time Waiver Modal -->
+    <!-- One Time / Additional Waiver Modal -->
     <div id="customWaiverModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000;">
-        <div class="card" style="width: 100%; max-width: 500px; padding: 30px; text-align: left;">
-            <h2 style="margin-bottom: 5px;">Create One Time Waiver</h2>
-            <p class="subtitle">Manually generate a custom tracking record.</p>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+        <div class="card" style="width: 100%; max-width: 550px; padding: 30px; text-align: left;">
+            <h2 style="margin-bottom: 5px;">Add Custom / Additional Waiver</h2>
+            <p class="subtitle">Generate an extra waiver for a specific period.</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                 <div>
                     <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Job ID</label>
-                    <input type="text" id="cwJobId" placeholder="e.g., J-101" required>
+                    <input type="text" id="cwJobId" placeholder="e.g., 21587" required>
                 </div>
                 <div>
                     <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Vendor ID</label>
-                    <input type="text" id="cwVendorId" placeholder="e.g., V-500" required>
+                    <input type="text" id="cwVendorId" placeholder="e.g., 36046" required>
                 </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; background: var(--bg-color); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 15px;">
                 <div>
-                    <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Target Month</label>
-                    <select id="cwMonth">
+                    <label style="font-size: 0.85em; font-weight: bold; color: var(--brand-color);">Pay App Month</label>
+                    <select id="cwMonth" style="margin-bottom: 0;">
                         <option value="1">1 - Jan</option><option value="2">2 - Feb</option>
                         <option value="3">3 - Mar</option><option value="4">4 - Apr</option>
                         <option value="5">5 - May</option><option value="6">6 - Jun</option>
@@ -515,21 +533,46 @@
                     </select>
                 </div>
                 <div>
-                    <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Target Year</label>
-                    <input type="number" id="cwYear" value="2026">
+                    <label style="font-size: 0.85em; font-weight: bold; color: var(--brand-color);">Pay App Year</label>
+                    <input type="number" id="cwYear" value="2026" style="margin-bottom: 0;">
+                </div>
+                <div>
+                    <label style="font-size: 0.85em; font-weight: bold; color: #10b981;">Waiver Month (Opt)</label>
+                    <select id="cwWaiverMonth" style="margin-bottom: 0;">
+                        <option value="">-- Auto Calc --</option>
+                        <option value="1">1 - Jan</option><option value="2">2 - Feb</option>
+                        <option value="3">3 - Mar</option><option value="4">4 - Apr</option>
+                        <option value="5">5 - May</option><option value="6">6 - Jun</option>
+                        <option value="7">7 - Jul</option><option value="8">8 - Aug</option>
+                        <option value="9">9 - Sep</option><option value="10">10 - Oct</option>
+                        <option value="11">11 - Nov</option><option value="12">12 - Dec</option>
+                    </select>
                 </div>
             </div>
-            <hr style="border: none; border-top: 1px solid var(--border-color); margin: 20px 0;">
-            <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Custom Through Period</label>
+
+            <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Custom Through Period (Optional)</label>
             <input type="text" id="cwThrough" placeholder="e.g., 8/15/2026 to 9/10/2026">
-            <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Custom Due Date</label>
+            <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Custom Due Date (Optional)</label>
             <input type="text" id="cwDue" placeholder="e.g., 10/15/2026">
+            
             <div style="display: flex; gap: 10px; margin-top: 10px;">
                 <button id="cancelCustomWaiverBtn" class="primary-btn" style="background: transparent; color: var(--text-main); border: 1px solid var(--border-color);">Cancel</button>
                 <button id="saveCustomWaiverBtn" class="primary-btn">Generate & Save</button>
             </div>
         </div>
     </div>
+
+    <!-- Search / Lookup Modal -->
+    <dialog id="lookupModal" style="padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--surface-color); width: 450px; box-shadow: var(--card-shadow); color: var(--text-main);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 id="lookupTitle" style="margin: 0; color: var(--text-main);">Search</h3>
+            <button id="closeLookupBtn" style="background: transparent; border: none; font-size: 1.2em; cursor: pointer; color: var(--text-muted);">✖</button>
+        </div>
+        <input type="text" id="lookupSearchInput" placeholder="Type a name or ID..." style="width: 100%; padding: 10px; margin-bottom: 15px; box-sizing: border-box;">
+        <div id="lookupResults" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-color);">
+            <!-- Live results injected here -->
+        </div>
+    </dialog>
 
     <!-- Core Scripts -->
     <script src="js/core/storage.js"></script>
