@@ -386,10 +386,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
     if (cancelSetupBtn) cancelSetupBtn.addEventListener('click', () => setupModal.close());
 
-    // --- The Scanner & "Final Collected" Contract Check ---
+    // --- The Auto-Discovery Scanner & Validation Engine ---
     if (scanBtn) {
         scanBtn.addEventListener('click', () => {
             const jobId = document.getElementById('setupJobId').value.trim().toLowerCase();
+            const targetMonth = parseInt(document.getElementById('setupMonth').value);
+            const targetYear = parseInt(document.getElementById('setupYear').value);
+
             if (!jobId) return alert("Please enter a Job ID.");
 
             const waivers = window.Workspace.appData.waivers || [];
@@ -399,21 +402,47 @@ window.addEventListener('DOMContentLoaded', () => {
             checklistContainer.style.display = "block";
 
             // 1. Get all past waiver records for this specific job
-            const pastJobWaivers = waivers.filter(w => String(w["Job ID"]).trim().toLowerCase() === jobId);
+            const jobWaivers = waivers.filter(w => String(w["Job ID"]).trim().toLowerCase() === jobId);
             
-            if (pastJobWaivers.length === 0) {
-                checklistContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 10px;">No previous vendors found for this Job ID. They will need to be added manually.</div>`;
+            if (jobWaivers.length === 0) {
+                checklistContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 10px;">No history found for Job ID ${jobId}. Please use "Setup New Job" first.</div>`;
                 confirmSetupBtn.disabled = true;
                 return;
             }
 
-            // 2. Identify unique vendors and check Contract Info for "Final Collected"
+            // 2. Find the LATEST Month/Year currently logged for this job in the master tracker
+            let maxYear = 0;
+            let maxMonth = 0;
+
+            jobWaivers.forEach(w => {
+                const y = parseInt(w["Year"]);
+                const m = parseInt(w["Month"]);
+                if (!isNaN(y) && !isNaN(m)) {
+                    if (y > maxYear || (y === maxYear && m > maxMonth)) {
+                        maxYear = y;
+                        maxMonth = m;
+                    }
+                }
+            });
+
+            // 3. Sequence Validation: Prevent setting up past or duplicate months
+            const targetValue = (targetYear * 12) + targetMonth;
+            const latestValue = (maxYear * 12) + maxMonth;
+
+            if (targetValue <= latestValue) {
+                checklistContainer.innerHTML = `<div style="text-align: center; color: #b91c1c; padding: 10px; font-weight: bold;">⚠️ Cannot set up ${targetMonth}/${targetYear}. The latest active cycle for this job is already ${maxMonth}/${maxYear}. You can only roll forward into future months.</div>`;
+                confirmSetupBtn.disabled = true;
+                return;
+            }
+
+            // 4. Grab vendors from that exact LATEST active cycle who are NOT finalized
+            const latestCycleWaivers = jobWaivers.filter(w => parseInt(w["Year"]) === maxYear && parseInt(w["Month"]) === maxMonth);
             const vendorMap = new Map();
-            
-            pastJobWaivers.forEach(w => {
+
+            latestCycleWaivers.forEach(w => {
                 const vendorId = String(w["Vendor ID"]).trim();
                 
-                // Look up this specific vendor's contract row for this job
+                // Check Contract Info for "Final Collected"
                 const contractRow = contractInfoData.find(c => 
                     String(c["Job ID"] || "").trim().toLowerCase() === jobId && 
                     String(c["Vendor ID"] || "").trim().toLowerCase() === vendorId.toLowerCase()
@@ -422,13 +451,12 @@ window.addEventListener('DOMContentLoaded', () => {
                 const finalCollectedVal = contractRow ? String(contractRow["Final Collected"] || "").trim().toLowerCase() : "";
                 const isFinal = (finalCollectedVal === "yes");
 
-                // Keep track of the vendor; if they are final anywhere, lock them out
-                if (!vendorMap.has(vendorId) || isFinal) {
-                    vendorMap.set(vendorId, { isFinal: isFinal });
+                if (!isFinal) {
+                    vendorMap.set(vendorId, { isFinal: false });
                 }
             });
 
-            // 3. Render the checklist
+            // 5. Render the checklist of non-finalized vendors
             let validCount = 0;
             vendorMap.forEach((data, vendorId) => {
                 let vendorName = vendorId;
@@ -437,30 +465,21 @@ window.addEventListener('DOMContentLoaded', () => {
                 const div = document.createElement('div');
                 div.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid var(--border-color);";
                 
-                if (data.isFinal) {
-                    div.innerHTML = `
-                        <label style="display: flex; align-items: center; gap: 10px; color: var(--text-muted); text-decoration: line-through;">
-                            <input type="checkbox" class="rollover-cb" value="${vendorId}" disabled> 
-                            ${vendorId} - ${vendorName}
-                        </label>
-                        <span style="font-size: 0.8em; color: #b91c1c; font-weight: bold; background: #fee2e2; padding: 2px 6px; border-radius: 4px;">Final Collected</span>
-                    `;
-                } else {
-                    validCount++;
-                    div.innerHTML = `
-                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: bold; color: var(--text-main);">
-                            <input type="checkbox" class="rollover-cb" value="${vendorId}" checked style="transform: scale(1.2);"> 
-                            ${vendorId} - ${vendorName}
-                        </label>
-                    `;
-                }
+                validCount++;
+                div.innerHTML = `
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: bold; color: var(--text-main);">
+                        <input type="checkbox" class="rollover-cb" value="${vendorId}" checked style="transform: scale(1.2);"> 
+                        ${vendorId} - ${vendorName}
+                    </label>
+                    <span style="font-size: 0.75em; color: var(--text-muted);">Rolled from ${maxMonth}/${maxYear}</span>
+                `;
                 checklistContainer.appendChild(div);
             });
 
             if (validCount > 0) {
                 confirmSetupBtn.disabled = false;
             } else {
-                checklistContainer.innerHTML += `<div style="text-align: center; color: #b91c1c; padding: 10px; font-weight: bold;">All historical vendors on this job have a "Yes" for Final Collected.</div>`;
+                checklistContainer.innerHTML += `<div style="text-align: center; color: #b91c1c; padding: 10px; font-weight: bold;">All active vendors from the last cycle (${maxMonth}/${maxYear}) have "Yes" for Final Collected. No records to rollover.</div>`;
             }
         });
     }
@@ -482,7 +501,6 @@ window.addEventListener('DOMContentLoaded', () => {
                 let newRecords = [];
                 const jobSettings = window.Workspace.appData.jobNotes?.find(j => String(j["Job ID"]).trim().toLowerCase() === jobId.toLowerCase()) || {};
 
-                // Generate a fresh record for every selected vendor using your math engine
                 for (const vendorId of checkedVendors) {
                     const { startDay, endingDay, waiverMonthInt } = calculatePeriodDates(targetMonth, targetYear, "trailing", jobSettings["Through Day"] || 31);
                     const defaultThrough = `${startDay.toLocaleDateString()} to ${endingDay.toLocaleDateString()}`;
@@ -490,16 +508,13 @@ window.addEventListener('DOMContentLoaded', () => {
                     const dueDay = parseInt(jobSettings["Waiver Due Day"]) || 25;
                     const defaultDue = new Date(targetYear, parseInt(targetMonth), dueDay).toLocaleDateString();
 
-                    // Uses prepareNewWaiver from waiverTool.js
                     const newRow = prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, defaultThrough, defaultDue, waiverMonthInt);
                     newRecords.push(newRow);
                 }
 
-                // Batch save to Excel
                 const fileHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.waivers);
                 await UpdateExcel(fileHandle, newRecords, "Waiver ID", "Waivers"); 
 
-                // Push to live memory and refresh table
                 if (!window.Workspace.appData.waivers) window.Workspace.appData.waivers = [];
                 window.Workspace.appData.waivers.push(...newRecords);
                 
@@ -507,7 +522,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 if (typeof renderWaiverTable === "function") renderWaiverTable();
 
                 setupModal.close();
-                alert(`Successfully generated ${newRecords.length} new waiver records for Job ${jobId}!`);
+                alert(`Successfully rolled over ${newRecords.length} vendors for Job ${jobId} into ${targetMonth}/${targetYear}!`);
 
             } catch (err) {
                 console.error("Rollover failed:", err);
