@@ -10,14 +10,11 @@ window.addEventListener('DOMContentLoaded', () => {
                 return alert("Please sync data first.");
             }
             
-            // Change button text while scanning
             const originalText = launchBtn.innerHTML;
             launchBtn.innerHTML = `<h3><span style="animation: pulse 1.5s infinite;">⏳</span> Sweeping Inbox...</h3>`;
             
-            // Run the scan and move files from Inbox to Triage
             await sweepInboxToTriage();
             
-            // Restore button and open view
             launchBtn.innerHTML = originalText;
             switchView('approvalQueueView');
             renderQueueList();
@@ -31,18 +28,16 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('aqRejectBtn')?.addEventListener('click', processRejection);
 });
 
-// --- Helper: Safely navigate to \Data\MainData\Email Attachments\ ---
 async function getAttachmentsBaseFolder() {
     let currentDir = window.Workspace.dirHandle;
     const pathParts = ["Data", "MainData", "Email Attachments"];
-    
     for (const folder of pathParts) {
         currentDir = await currentDir.getDirectoryHandle(folder, { create: true });
     }
     return currentDir;
 }
 
-// --- 1. The Background Sweeper ---
+// --- 1. Background Sweeper ---
 async function sweepInboxToTriage() {
     const baseFolder = await getAttachmentsBaseFolder();
     const inboxFolder = await baseFolder.getDirectoryHandle('Waivers_1_Inbox', { create: true });
@@ -62,15 +57,13 @@ async function sweepInboxToTriage() {
 
     for await (const entry of inboxFolder.values()) {
         if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.pdf')) {
-            // Find the "Unscanned" row Power Automate created
             const row = queueData.find(r => r["File Name"] === entry.name);
-            if (!row) continue; // Skip if PA hasn't finished writing the Excel row yet
+            if (!row) continue; 
 
             try {
                 const file = await entry.getFile();
                 const arrayBuffer = await file.arrayBuffer();
 
-                // Scan QR if browser supports it
                 if (detector && pdfjsLib) {
                     const pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
                     const page = await pdfDoc.getPage(1);
@@ -86,29 +79,26 @@ async function sweepInboxToTriage() {
                     
                     if (barcodes.length > 0) {
                         const parts = barcodes[0].rawValue.split(' ');
-                        // Example: ["21587", "0000036046", "012027", "|122026", "UNCOND"]
                         
-                        row["Job ID"] = parts[0];
-                        row["Vendor ID"] = parts[1].replace(/^0+/, '');
+                        row["Extracted Job ID"] = parts[0];
+                        row["Extracted Vendor ID"] = parts[1].replace(/^0+/, '');
                         
-                        // Extract Pay App Date (MMYYYY)
                         row["Pay App Month"] = parts[2].substring(0, 2);
-                        row["Pay App Year"] = parts[2].substring(2, 6); 
-
-                        // Extract Waiver Date (Strip the pipe symbol first)
-                        const wDate = parts[3].replace('|', ''); // e.g. "122026"
-                        row["Waiver Month"] = wDate.substring(0, 2);
-                        row["Waiver Year"] = wDate.substring(2, 6); 
-
-                        // Extract Type
-                        row["Waiver Type"] = parts[4] || "";
+                        row["Pay App Year"] = parts[2].substring(2, 6);
                         
+                        const wDate = parts[3].replace('|', '');
+                        row["WaiverMonth"] = wDate.substring(0, 2);
+                        row["WaiverYear"] = wDate.substring(2, 6);
+                        
+                        row["Waiver Type"] = parts[4] || "";
                         row["Status"] = "Pending Review";
                     } else {
                         row["Status"] = "Pending Review (Manual)";
                     }
+                } else {
+                    row["Status"] = "Pending Review (Manual)";
+                }
 
-                // Move file to Triage
                 const newFileHandle = await triageFolder.getFileHandle(entry.name, { create: true });
                 const writable = await newFileHandle.createWritable();
                 await writable.write(arrayBuffer);
@@ -166,8 +156,9 @@ function renderQueueList() {
             <div style="font-weight: bold; color: var(--text-main); margin-bottom: 5px;">${item["File Name"] || "Unknown Document"}</div>
             <div style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 3px;">Sender: ${item["Sender Email"] || "-"}</div>
             <div style="font-size: 0.85em; color: var(--text-muted);">
-                <span style="background: #e2e8f0; color: #334155; padding: 2px 6px; border-radius: 4px; font-family: monospace;">J: ${item["Extracted Job ID"] || "null"}</span>
-                <span style="background: #e2e8f0; color: #334155; padding: 2px 6px; border-radius: 4px; font-family: monospace;">V: ${item["Extracted Vendor ID"] || "null"}</span>
+                <span style="background: #e2e8f0; color: #334155; padding: 2px 6px; border-radius: 4px; font-family: monospace;">J: ${item["Extracted Job ID"] || "-"}</span>
+                <span style="background: #e2e8f0; color: #334155; padding: 2px 6px; border-radius: 4px; font-family: monospace;">V: ${item["Extracted Vendor ID"] || "-"}</span>
+                <span style="background: #fef08a; color: #854d0e; padding: 2px 6px; border-radius: 4px; font-family: monospace; margin-left: 5px;">${item["Waiver Type"] || "Type"}</span>
             </div>
         `;
 
@@ -180,11 +171,13 @@ function renderQueueList() {
 function loadQueueItem(item) {
     activeQueueItem = item;
     
-    // Instantly load the fields mapped by the Sweeper
     document.getElementById('aqJobId').value = item["Extracted Job ID"] || "";
     document.getElementById('aqVendorId').value = item["Extracted Vendor ID"] || "";
-    document.getElementById('aqMonth').value = item["WaiverMonth"] || "";
-    document.getElementById('aqYear').value = item["WaiverYear"] || "";
+    document.getElementById('aqType').value = item["Waiver Type"] || "";
+    document.getElementById('aqPayAppMonth').value = item["Pay App Month"] || "";
+    document.getElementById('aqPayAppYear').value = item["Pay App Year"] || "";
+    document.getElementById('aqWaiverMonth').value = item["WaiverMonth"] || "";
+    document.getElementById('aqWaiverYear').value = item["WaiverYear"] || "";
 
     const frame = document.getElementById('aqPdfFrame');
     frame.src = item["File Link"] || "about:blank";
@@ -199,8 +192,12 @@ function clearSelection() {
     activeQueueItem = null;
     document.getElementById('aqJobId').value = "";
     document.getElementById('aqVendorId').value = "";
-    document.getElementById('aqMonth').value = "";
-    document.getElementById('aqYear').value = "";
+    document.getElementById('aqType').value = "";
+    document.getElementById('aqPayAppMonth').value = "";
+    document.getElementById('aqPayAppYear').value = "";
+    document.getElementById('aqWaiverMonth').value = "";
+    document.getElementById('aqWaiverYear').value = "";
+    
     document.getElementById('aqPdfFrame').src = "about:blank";
     document.getElementById('aqApproveBtn').disabled = true;
     document.getElementById('aqRejectBtn').disabled = true;
@@ -212,48 +209,34 @@ async function processApproval() {
 
     const finalJob = document.getElementById('aqJobId').value.trim();
     const finalVendor = document.getElementById('aqVendorId').value.trim();
-    const finalMonth = document.getElementById('aqMonth').value.trim();
-    const finalYear = document.getElementById('aqYear').value.trim();
+    const finalType = document.getElementById('aqType').value.trim();
+    
+    const finalPayAppMonth = document.getElementById('aqPayAppMonth').value.trim();
+    const finalPayAppYear = document.getElementById('aqPayAppYear').value.trim();
+    const finalWaiverMonth = document.getElementById('aqWaiverMonth').value.trim();
+    const finalWaiverYear = document.getElementById('aqWaiverYear').value.trim();
 
-    if (!finalJob || !finalVendor || !finalMonth || !finalYear) {
-        return alert("Please ensure all ID and Date fields are filled out.");
+    if (!finalJob || !finalVendor || !finalPayAppMonth || !finalPayAppYear || !finalType) {
+        return alert("Please ensure Job, Vendor, Type, and Pay App dates are filled out.");
     }
 
     try {
         document.getElementById('aqApproveBtn').textContent = "Processing...";
         document.getElementById('aqApproveBtn').disabled = true;
 
-        const waivers = window.Workspace.appData.waivers;
-        const matchingWaiver = waivers.find(w => 
-            String(w["Job ID"]).trim() === finalJob &&
-            String(w["Vendor ID"]).trim() === finalVendor &&
-            parseInt(w["Month"]) === parseInt(finalMonth) &&
-            String(w["Year"]).trim() === finalYear
-        );
-
-        let masterRecordsToUpdate = [];
-        if (matchingWaiver) {
-            matchingWaiver["Status"] = "Received";
-            matchingWaiver["Received Date"] = new Date().toLocaleDateString();
-            matchingWaiver["Notes"] = `Approved via Queue from ${activeQueueItem["Sender Email"]}.\n${matchingWaiver["Notes"] || ""}`;
-            masterRecordsToUpdate.push(matchingWaiver);
-        } else {
-            alert(`Warning: Could not find a pending record in Master Waiver for Job ${finalJob}, Vendor ${finalVendor}. File will still be routed.`);
-        }
-
         await routeFileLocally(activeQueueItem["File Name"], finalJob, finalVendor, finalWaiverMonth, finalWaiverYear, finalType);
 
         activeQueueItem["Status"] = "Approved";
         activeQueueItem["Extracted Job ID"] = finalJob; 
         activeQueueItem["Extracted Vendor ID"] = finalVendor;
+        activeQueueItem["Waiver Type"] = finalType;
+        activeQueueItem["Pay App Month"] = finalPayAppMonth;
+        activeQueueItem["Pay App Year"] = finalPayAppYear;
+        activeQueueItem["WaiverMonth"] = finalWaiverMonth;
+        activeQueueItem["WaiverYear"] = finalWaiverYear;
         
         const reviewQueueHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.waiverReviewQueue);
         await UpdateExcel(reviewQueueHandle, [activeQueueItem], "Queue ID", "WaiverReviewQueue");
-        
-        if (masterRecordsToUpdate.length > 0) {
-            const masterFileHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.waivers);
-            await UpdateExcel(masterFileHandle, masterRecordsToUpdate, "Waiver ID", "Waivers");
-        }
 
         clearSelection();
         renderQueueList();
@@ -326,17 +309,14 @@ async function routeFileLocally(fileName, targetJob, vendorId, waiverMonth, waiv
         const fileHandle = await triageFolder.getFileHandle(fileName);
         const file = await fileHandle.getFile();
 
-        // 1. Look up Vendor Name and sanitize for OS saving
         let vendorName = vendorId;
         try { vendorName = window.WaiverMath.getEmailInfo(targetJob, vendorId, "Vendor Name") || vendorId; } catch(e) {}
         const cleanVendorName = vendorName.replace(/[^a-zA-Z0-9 -]/g, "").trim();
 
-        // 2. Look up BURG Name from Master Job Info
         const jobInfo = window.Workspace.appData.jobInfo || [];
         const jobData = jobInfo.find(j => String(j["Job ID"]).trim().toLowerCase() === String(targetJob).toLowerCase()) || {};
         let burgName = String(jobData["BURG Name"] || "Unknown Burg").trim().replace(/[^a-zA-Z0-9 -]/g, "");
 
-        // 3. Format Strings
         const formattedWMonth = String(waiverMonth).padStart(2, '0');
         const wYear4 = String(waiverYear);
         const wYear2 = wYear4.slice(-2);
@@ -344,7 +324,6 @@ async function routeFileLocally(fileName, targetJob, vendorId, waiverMonth, waiv
         const folderName = `${formattedWMonth}-${wYear4}`; 
         const newFileName = `${targetJob}-${formattedWMonth}${wYear2}_${cleanVendorName}_${waiverType}_rec.pdf`;
 
-        // 4. Drill down: Waivers -> BURG -> JobID -> MM-YYYY
         const waiversBase = await window.Workspace.dirHandle.getDirectoryHandle("Waivers", { create: true });
         
         let burgFolder = null;
@@ -362,7 +341,6 @@ async function routeFileLocally(fileName, targetJob, vendorId, waiverMonth, waiv
         const jobFolder = await burgFolder.getDirectoryHandle(targetJob, { create: true });
         const periodFolder = await jobFolder.getDirectoryHandle(folderName, { create: true });
 
-        // 5. Save and delete from Triage
         const newFileHandle = await periodFolder.getFileHandle(newFileName, { create: true });
         const writable = await newFileHandle.createWritable();
         await writable.write(await file.arrayBuffer());

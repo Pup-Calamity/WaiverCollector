@@ -25,7 +25,9 @@ window.Workspace = {
         noticeTracker: [],
         jobNotes: [],
         billingTracker: [],
-        burgEmails: []
+        burgEmails: [],
+        waiverReviewQueue: [],
+        waiverEmails: []
     }
 };
 
@@ -49,6 +51,8 @@ window.WORKSPACE_FILE_PATHS = {
     jobNotes: "Data/MainData/Job Notes.xlsx",
     waiverInvoices: "Data/DailyUpdateData/Waiver Invoices.xlsx",
     burgEmails: "Data/MainData/Burg Emails.xlsx",
+    waiverReviewQueue: "Data/MainData/WaiverReviewQueue.xlsx",
+    waiverEmails: "Data/MainData/Waiver Emails.xlsx"
 };
 
 // --- UI Navigation Helpers ---
