@@ -196,350 +196,7 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-});
 
-
-// --- Dynamic Year Dropdown ---
-window.populateYearFilter = function() {
-    const waivers = window.Workspace.appData.waivers || [];
-    const yearSelect = document.getElementById('dashboardYear');
-    if (!yearSelect) return;
-    
-    const uniqueYears = [...new Set(waivers.map(w => String(w["Year"]).trim()))].filter(y => y && y !== "undefined");
-    uniqueYears.sort((a, b) => b - a);
-
-    yearSelect.innerHTML = '<option value="">All Years</option>';
-    uniqueYears.forEach(year => {
-        const opt = document.createElement('option');
-        opt.value = year;
-        opt.textContent = year;
-        yearSelect.appendChild(opt);
-    });
-}
-
-// --- Dynamic Year Dropdown ---
-window.populateYearFilter = function() {
-    const waivers = window.Workspace.appData.waivers || [];
-    const yearSelect = document.getElementById('dashboardYear');
-    if (!yearSelect) return;
-    
-    const uniqueYears = [...new Set(waivers.map(w => String(w["Year"]).trim()))].filter(y => y && y !== "undefined");
-    uniqueYears.sort((a, b) => b - a);
-
-    yearSelect.innerHTML = '<option value="">All Years</option>';
-    uniqueYears.forEach(year => {
-        const opt = document.createElement('option');
-        opt.value = year;
-        opt.textContent = year;
-        yearSelect.appendChild(opt);
-    });
-}
-
-// --- Master Table Renderer ---
-window.renderWaiverTable = function() {
-    const waivers = window.Workspace.appData.waivers || [];
-    const tbody = document.getElementById('waiverTableBody');
-    if (!tbody) return;
-
-    // Reset Select All checkbox when table updates
-    const selectAllCb = document.getElementById('selectAllWaivers');
-    if (selectAllCb) selectAllCb.checked = false;
-
-    // Safely get filter values
-    const searchVal = document.getElementById('dashboardSearch') ? document.getElementById('dashboardSearch').value.toLowerCase() : "";
-    const statusVal = document.getElementById('dashboardStatus') ? document.getElementById('dashboardStatus').value.toLowerCase() : ""; 
-    const monthVal = document.getElementById('dashboardMonth') ? document.getElementById('dashboardMonth').value : "";
-    const yearVal = document.getElementById('dashboardYear') ? document.getElementById('dashboardYear').value : "";
-
-    tbody.innerHTML = "";
-
-    const sortedWaivers = [...waivers].reverse(); 
-    let matchCount = 0;
-
-    for (const row of sortedWaivers) {
-        const jobId = String(row["Job ID"] || "").trim();
-        const vendorId = String(row["Vendor ID"] || "").trim();
-        const customerId = String(row["Customer ID"] || "").trim();
-        const rowStatusRaw = String(row["Status"] || "").trim();
-        
-        let jobName = "Unknown Job";
-        let vendorName = "Unknown Vendor";
-
-        try {
-            if (typeof WaiverMath !== 'undefined') {
-                jobName = WaiverMath.getEmailInfo(jobId, vendorId, "Job Name") || "Unknown Job";
-                vendorName = WaiverMath.getEmailInfo(jobId, vendorId, "Vendor Name") || "Unknown Vendor";
-            }
-        } catch (error) {}
-
-        // 1. FILTER: Status
-        if (statusVal) {
-            const checkStatus = rowStatusRaw.toLowerCase();
-            if (statusVal === "held") {
-                if (!checkStatus.includes("held")) continue; 
-            } else if (statusVal === "received") {
-                if (checkStatus !== "received" && checkStatus !== "paid") continue;
-            } else {
-                if (checkStatus !== statusVal) continue;
-            }
-        }
-
-        // 2. FILTER: Month & Year
-        // Use parseInt to ensure "09" matches "9" safely
-        if (monthVal && parseInt(row["Month"]) !== parseInt(monthVal)) continue;
-        
-        if (yearVal && String(row["Year"]).trim() !== yearVal) continue;
-
-        // 3. FILTER: Search Bar 
-        const searchString = `${jobId} ${jobName} ${vendorId} ${vendorName} ${customerId}`.toLowerCase();
-        if (searchVal && !searchString.includes(searchVal)) continue;
-
-        matchCount++;
-        if (matchCount > 200) break; 
-
-        // 4. Format Status Color Bubble
-        let statusStyle = "background: #e2e8f0; color: #475569;"; 
-        if (rowStatusRaw.toLowerCase() === "ready") statusStyle = "background: #dbeafe; color: #1d4ed8;";
-        if (rowStatusRaw.toLowerCase() === "sent") statusStyle = "background: #fef9c3; color: #854d0e;";
-        if (rowStatusRaw.toLowerCase() === "received" || rowStatusRaw.toLowerCase() === "paid") statusStyle = "background: #dcfce7; color: #15803d;";
-        if (rowStatusRaw.toLowerCase().includes("held")) statusStyle = "background: #fee2e2; color: #b91c1c;";
-
-        // 5. Convert Month Number to Name
-        const monthNum = parseInt(row["Month"]);
-        const displayMonth = !isNaN(monthNum) && monthNum >= 1 && monthNum <= 12 ? monthNames[monthNum] : row["Month"];
-
-        const tr = document.createElement('tr');
-        tr.style.borderBottom = "1px solid var(--border-color)";
-        
-        tr.innerHTML = `
-            <td style="padding: 6px 10px; text-align: center;">
-                <input type="checkbox" class="row-checkbox" style="transform: scale(1.0); cursor: pointer;" 
-                       data-waiver-id="${row["Waiver ID"]}">
-            </td>
-            <td style="padding: 6px 10px; font-family: monospace; font-size: 0.9em;"><strong>${row["Waiver ID"] || ""}</strong></td>
-            <td style="padding: 6px 10px;">
-                <div style="font-weight: bold; line-height: 1.1;">${jobId}</div>
-                <div style="font-size: 0.75em; color: var(--text-muted);">${jobName}</div>
-            </td>
-            <td style="padding: 6px 10px;">
-                <div style="font-weight: bold; line-height: 1.1;">${vendorId}</div>
-                <div style="font-size: 0.75em; color: var(--text-muted);">${vendorName}</div>
-            </td>
-            <td style="padding: 6px 10px;">${displayMonth}</td>
-            <td style="padding: 6px 10px;">
-                <span style="padding: 2px 6px; border-radius: 8px; font-size: 0.75em; font-weight: bold; ${statusStyle}">${rowStatusRaw}</span>
-            </td>
-            <td style="padding: 6px 10px; font-size: 0.85em;">${row["Sent Date"] || "-"}</td>
-            <td style="padding: 6px 10px; font-size: 0.85em;">${row["Received Date"] || "-"}</td>
-            <td style="padding: 6px 10px; font-size: 0.85em;">${row["Action Date"] || "-"}</td>
-            <td style="padding: 6px 10px; text-align: center;">
-                <button class="read-notes-btn" title="View Notes" style="background: transparent; font-size: 1em; border: none; cursor: pointer; padding: 2px 4px;">📝</button>
-            </td>
-        `;
-
-        const notesBtn = tr.querySelector('.read-notes-btn');
-        if (notesBtn) {
-            const rawNotes = row["Notes"] || "No notes available.";
-            notesBtn.addEventListener('click', () => {
-                document.getElementById('notesModalContent').textContent = rawNotes;
-                document.getElementById('newNoteInput').value = "";
-                
-                // Bulletproof way to set the attribute
-                const idToSave = row["Waiver ID"] || row["WaiverID"] || ""; // Fallback in case of Excel header differences
-                document.getElementById('readNotesModal').setAttribute('data-waiver-id', idToSave);
-                
-                document.getElementById('readNotesModal').showModal();
-            });
-        }
-
-        tbody.appendChild(tr);
-    }
-
-    if (matchCount === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" style="padding: 20px; text-align: center; color: var(--text-muted);">No waivers found matching these filters.</td></tr>`;
-    }
-};
-
-// ==========================================
-// MONTHLY ROLLOVER / JOB SETUP ENGINE
-// ==========================================
-
-window.addEventListener('DOMContentLoaded', () => {
-    const setupModal = document.getElementById('setupMonthModal');
-    const openSetupBtn = document.getElementById('openSetupMonthBtn');
-    const cancelSetupBtn = document.getElementById('cancelSetupBtn');
-    const scanBtn = document.getElementById('setupScanBtn');
-    const confirmSetupBtn = document.getElementById('confirmSetupBtn');
-
-    if (openSetupBtn) {
-        openSetupBtn.addEventListener('click', () => {
-            const today = new Date();
-            document.getElementById('setupMonth').value = today.getMonth() + 1;
-            document.getElementById('setupYear').value = today.getFullYear();
-            document.getElementById('setupJobId').value = "";
-            document.getElementById('setupVendorChecklist').style.display = "none";
-            document.getElementById('setupVendorChecklist').innerHTML = "";
-            confirmSetupBtn.disabled = true;
-            setupModal.showModal();
-        });
-    }
-
-    if (cancelSetupBtn) cancelSetupBtn.addEventListener('click', () => setupModal.close());
-
-    // --- The Auto-Discovery Scanner & Validation Engine ---
-    if (scanBtn) {
-        scanBtn.addEventListener('click', () => {
-            const jobId = document.getElementById('setupJobId').value.trim().toLowerCase();
-            const targetMonth = parseInt(document.getElementById('setupMonth').value);
-            const targetYear = parseInt(document.getElementById('setupYear').value);
-
-            if (!jobId) return alert("Please enter a Job ID.");
-
-            const waivers = window.Workspace.appData.waivers || [];
-            const contractInfoData = window.Workspace.appData.contractInfo || [];
-            const checklistContainer = document.getElementById('setupVendorChecklist');
-            checklistContainer.innerHTML = "";
-            checklistContainer.style.display = "block";
-
-            // 1. Get all past waiver records for this specific job
-            const jobWaivers = waivers.filter(w => String(w["Job ID"]).trim().toLowerCase() === jobId);
-            
-            if (jobWaivers.length === 0) {
-                checklistContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 10px;">No history found for Job ID ${jobId}. Please use "Setup New Job" first.</div>`;
-                confirmSetupBtn.disabled = true;
-                return;
-            }
-
-            // 2. Find the LATEST Month/Year currently logged for this job in the master tracker
-            let maxYear = 0;
-            let maxMonth = 0;
-
-            jobWaivers.forEach(w => {
-                const y = parseInt(w["Year"]);
-                const m = parseInt(w["Month"]);
-                if (!isNaN(y) && !isNaN(m)) {
-                    if (y > maxYear || (y === maxYear && m > maxMonth)) {
-                        maxYear = y;
-                        maxMonth = m;
-                    }
-                }
-            });
-
-            // 3. Sequence Validation: Prevent setting up past or duplicate months
-            const targetValue = (targetYear * 12) + targetMonth;
-            const latestValue = (maxYear * 12) + maxMonth;
-
-            if (targetValue <= latestValue) {
-                checklistContainer.innerHTML = `<div style="text-align: center; color: #b91c1c; padding: 10px; font-weight: bold;">⚠️ Cannot set up ${targetMonth}/${targetYear}. The latest active cycle for this job is already ${maxMonth}/${maxYear}. You can only roll forward into future months.</div>`;
-                confirmSetupBtn.disabled = true;
-                return;
-            }
-
-            // 4. Grab vendors from that exact LATEST active cycle who are NOT finalized
-            const latestCycleWaivers = jobWaivers.filter(w => parseInt(w["Year"]) === maxYear && parseInt(w["Month"]) === maxMonth);
-            const vendorMap = new Map();
-
-            latestCycleWaivers.forEach(w => {
-                const vendorId = String(w["Vendor ID"]).trim();
-                
-                // Check Contract Info for "Final Collected"
-                const contractRow = contractInfoData.find(c => 
-                    String(c["Job ID"] || "").trim().toLowerCase() === jobId && 
-                    String(c["Vendor ID"] || "").trim().toLowerCase() === vendorId.toLowerCase()
-                );
-
-                const finalCollectedVal = contractRow ? String(contractRow["Final Collected"] || "").trim().toLowerCase() : "";
-                const isFinal = (finalCollectedVal === "yes");
-
-                if (!isFinal) {
-                    vendorMap.set(vendorId, { isFinal: false });
-                }
-            });
-
-            // 5. Render the checklist of non-finalized vendors
-            let validCount = 0;
-            vendorMap.forEach((data, vendorId) => {
-                let vendorName = vendorId;
-                try { vendorName = window.WaiverMath.getEmailInfo(jobId, vendorId, "Vendor Name") || vendorId; } catch(e) {}
-
-                const div = document.createElement('div');
-                div.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid var(--border-color);";
-                
-                validCount++;
-                div.innerHTML = `
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: bold; color: var(--text-main);">
-                        <input type="checkbox" class="rollover-cb" value="${vendorId}" checked style="transform: scale(1.2);"> 
-                        ${vendorId} - ${vendorName}
-                    </label>
-                    <span style="font-size: 0.75em; color: var(--text-muted);">Rolled from ${maxMonth}/${maxYear}</span>
-                `;
-                checklistContainer.appendChild(div);
-            });
-
-            if (validCount > 0) {
-                confirmSetupBtn.disabled = false;
-            } else {
-                checklistContainer.innerHTML += `<div style="text-align: center; color: #b91c1c; padding: 10px; font-weight: bold;">All active vendors from the last cycle (${maxMonth}/${maxYear}) have "Yes" for Final Collected. No records to rollover.</div>`;
-            }
-        });
-    }
-
-    // --- The Generator & Excel Saver ---
-    if (confirmSetupBtn) {
-        confirmSetupBtn.addEventListener('click', async () => {
-            const jobId = document.getElementById('setupJobId').value.trim();
-            const targetMonth = document.getElementById('setupMonth').value;
-            const targetYear = document.getElementById('setupYear').value;
-            const checkedVendors = Array.from(document.querySelectorAll('.rollover-cb:checked')).map(cb => cb.value);
-
-            if (checkedVendors.length === 0) return alert("No vendors selected to roll over.");
-
-            confirmSetupBtn.textContent = "Saving...";
-            confirmSetupBtn.disabled = true;
-
-            try {
-                let newRecords = [];
-                const jobSettings = window.Workspace.appData.jobNotes?.find(j => String(j["Job ID"]).trim().toLowerCase() === jobId.toLowerCase()) || {};
-
-                for (const vendorId of checkedVendors) {
-                    const { startDay, endingDay, waiverMonthInt } = calculatePeriodDates(targetMonth, targetYear, "trailing", jobSettings["Through Day"] || 31);
-                    const defaultThrough = `${startDay.toLocaleDateString()} to ${endingDay.toLocaleDateString()}`;
-                    
-                    const dueDay = parseInt(jobSettings["Waiver Due Day"]) || 25;
-                    const defaultDue = new Date(targetYear, parseInt(targetMonth), dueDay).toLocaleDateString();
-
-                    const newRow = prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, defaultThrough, defaultDue, waiverMonthInt);
-                    newRecords.push(newRow);
-                }
-
-                const fileHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.waivers);
-                await UpdateExcel(fileHandle, newRecords, "Waiver ID", "Waivers"); 
-
-                if (!window.Workspace.appData.waivers) window.Workspace.appData.waivers = [];
-                window.Workspace.appData.waivers.push(...newRecords);
-                
-                if (typeof populateYearFilter === "function") populateYearFilter();
-                if (typeof renderWaiverTable === "function") renderWaiverTable();
-
-                setupModal.close();
-                alert(`Successfully rolled over ${newRecords.length} vendors for Job ${jobId} into ${targetMonth}/${targetYear}!`);
-
-            } catch (err) {
-                console.error("Rollover failed:", err);
-                alert("Error saving rolled-over waivers. Check console.");
-            } finally {
-                confirmSetupBtn.textContent = "Create Waiver Records";
-                confirmSetupBtn.disabled = false;
-            }
-        });
-    }
-});
-
-// ==========================================
-// NEW JOB SETUP WIZARD ENGINE
-// ==========================================
-
-window.addEventListener('DOMContentLoaded', () => {
     const jobModal = document.getElementById('setupJobModal');
     const openJobBtn = document.getElementById('openSetupJobBtn');
     const cancelJobBtn = document.getElementById('cancelNewJobBtn');
@@ -683,3 +340,149 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// --- Dynamic Year Dropdown ---
+window.populateYearFilter = function() {
+    const waivers = window.Workspace.appData.waivers || [];
+    const yearSelect = document.getElementById('dashboardYear');
+    if (!yearSelect) return;
+    
+    const uniqueYears = [...new Set(waivers.map(w => String(w["Year"]).trim()))].filter(y => y && y !== "undefined");
+    uniqueYears.sort((a, b) => b - a);
+
+    yearSelect.innerHTML = '<option value="">All Years</option>';
+    uniqueYears.forEach(year => {
+        const opt = document.createElement('option');
+        opt.value = year;
+        opt.textContent = year;
+        yearSelect.appendChild(opt);
+    });
+}
+
+// --- Master Table Renderer ---
+window.renderWaiverTable = function() {
+    const waivers = window.Workspace.appData.waivers || [];
+    const tbody = document.getElementById('waiverTableBody');
+    if (!tbody) return;
+
+    // Reset Select All checkbox when table updates
+    const selectAllCb = document.getElementById('selectAllWaivers');
+    if (selectAllCb) selectAllCb.checked = false;
+
+    // Safely get filter values
+    const searchVal = document.getElementById('dashboardSearch') ? document.getElementById('dashboardSearch').value.toLowerCase() : "";
+    const statusVal = document.getElementById('dashboardStatus') ? document.getElementById('dashboardStatus').value.toLowerCase() : ""; 
+    const monthVal = document.getElementById('dashboardMonth') ? document.getElementById('dashboardMonth').value : "";
+    const yearVal = document.getElementById('dashboardYear') ? document.getElementById('dashboardYear').value : "";
+
+    tbody.innerHTML = "";
+
+    const sortedWaivers = [...waivers].reverse(); 
+    let matchCount = 0;
+
+    for (const row of sortedWaivers) {
+        const jobId = String(row["Job ID"] || "").trim();
+        const vendorId = String(row["Vendor ID"] || "").trim();
+        const customerId = String(row["Customer ID"] || "").trim();
+        const rowStatusRaw = String(row["Status"] || "").trim();
+        
+        let jobName = "Unknown Job";
+        let vendorName = "Unknown Vendor";
+
+        try {
+            if (typeof WaiverMath !== 'undefined') {
+                jobName = WaiverMath.getEmailInfo(jobId, vendorId, "Job Name") || "Unknown Job";
+                vendorName = WaiverMath.getEmailInfo(jobId, vendorId, "Vendor Name") || "Unknown Vendor";
+            }
+        } catch (error) {}
+
+        // 1. FILTER: Status
+        if (statusVal) {
+            const checkStatus = rowStatusRaw.toLowerCase();
+            if (statusVal === "held") {
+                if (!checkStatus.includes("held")) continue; 
+            } else if (statusVal === "received") {
+                if (checkStatus !== "received" && checkStatus !== "paid") continue;
+            } else {
+                if (checkStatus !== statusVal) continue;
+            }
+        }
+
+        // 2. FILTER: Month & Year
+        // Use parseInt to ensure "09" matches "9" safely
+        if (monthVal && parseInt(row["Month"]) !== parseInt(monthVal)) continue;
+        
+        if (yearVal && String(row["Year"]).trim() !== yearVal) continue;
+
+        // 3. FILTER: Search Bar 
+        const searchString = `${jobId} ${jobName} ${vendorId} ${vendorName} ${customerId}`.toLowerCase();
+        if (searchVal && !searchString.includes(searchVal)) continue;
+
+        matchCount++;
+        if (matchCount > 200) break; 
+
+        // 4. Format Status Color Bubble
+        let statusStyle = "background: #e2e8f0; color: #475569;"; 
+        if (rowStatusRaw.toLowerCase() === "ready") statusStyle = "background: #dbeafe; color: #1d4ed8;";
+        if (rowStatusRaw.toLowerCase() === "sent") statusStyle = "background: #fef9c3; color: #854d0e;";
+        if (rowStatusRaw.toLowerCase() === "received" || rowStatusRaw.toLowerCase() === "paid") statusStyle = "background: #dcfce7; color: #15803d;";
+        if (rowStatusRaw.toLowerCase().includes("held")) statusStyle = "background: #fee2e2; color: #b91c1c;";
+
+        // 5. Convert Month Number to Name
+        const monthNum = parseInt(row["Month"]);
+        const displayMonth = !isNaN(monthNum) && monthNum >= 1 && monthNum <= 12 ? monthNames[monthNum] : row["Month"];
+
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = "1px solid var(--border-color)";
+        
+        tr.innerHTML = `
+            <td style="padding: 6px 10px; text-align: center;">
+                <input type="checkbox" class="row-checkbox" style="transform: scale(1.0); cursor: pointer;" 
+                       data-waiver-id="${row["Waiver ID"]}">
+            </td>
+            <td style="padding: 6px 10px; font-family: monospace; font-size: 0.9em;"><strong>${row["Waiver ID"] || ""}</strong></td>
+            <td style="padding: 6px 10px;">
+                <div style="font-weight: bold; line-height: 1.1;">${jobId}</div>
+                <div style="font-size: 0.75em; color: var(--text-muted);">${jobName}</div>
+            </td>
+            <td style="padding: 6px 10px;">
+                <div style="font-weight: bold; line-height: 1.1;">${vendorId}</div>
+                <div style="font-size: 0.75em; color: var(--text-muted);">${vendorName}</div>
+            </td>
+            <td style="padding: 6px 10px;">${displayMonth}</td>
+            <td style="padding: 6px 10px;">
+                <span style="padding: 2px 6px; border-radius: 8px; font-size: 0.75em; font-weight: bold; ${statusStyle}">${rowStatusRaw}</span>
+            </td>
+            <td style="padding: 6px 10px; font-size: 0.85em;">${row["Sent Date"] || "-"}</td>
+            <td style="padding: 6px 10px; font-size: 0.85em;">${row["Received Date"] || "-"}</td>
+            <td style="padding: 6px 10px; font-size: 0.85em;">${row["Action Date"] || "-"}</td>
+            <td style="padding: 6px 10px; text-align: center;">
+                <button class="read-notes-btn" title="View Notes" style="background: transparent; font-size: 1em; border: none; cursor: pointer; padding: 2px 4px;">📝</button>
+            </td>
+        `;
+
+        const notesBtn = tr.querySelector('.read-notes-btn');
+        if (notesBtn) {
+            const rawNotes = row["Notes"] || "No notes available.";
+            notesBtn.addEventListener('click', () => {
+                document.getElementById('notesModalContent').textContent = rawNotes;
+                document.getElementById('newNoteInput').value = "";
+                
+                // Bulletproof way to set the attribute
+                const idToSave = row["Waiver ID"] || row["WaiverID"] || ""; // Fallback in case of Excel header differences
+                document.getElementById('readNotesModal').setAttribute('data-waiver-id', idToSave);
+                
+                document.getElementById('readNotesModal').showModal();
+            });
+        }
+
+        tbody.appendChild(tr);
+    }
+
+    if (matchCount === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" style="padding: 20px; text-align: center; color: var(--text-muted);">No waivers found matching these filters.</td></tr>`;
+    }
+
+
+    
+};
