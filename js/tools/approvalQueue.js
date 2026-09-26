@@ -168,7 +168,7 @@ function renderQueueList() {
 }
 
 // --- 3. Load Right Panel ---
-function loadQueueItem(item) {
+async function loadQueueItem(item) {
     activeQueueItem = item;
     
     document.getElementById('aqJobId').value = item["Extracted Job ID"] || "";
@@ -180,7 +180,25 @@ function loadQueueItem(item) {
     document.getElementById('aqWaiverYear').value = item["WaiverYear"] || "";
 
     const frame = document.getElementById('aqPdfFrame');
-    frame.src = item["File Link"] || "about:blank";
+    frame.src = "about:blank"; // Clear the frame while the new file loads
+
+    try {
+        // 1. Navigate to the Triage folder where the physical file lives
+        const baseFolder = await getAttachmentsBaseFolder();
+        const triageFolder = await baseFolder.getDirectoryHandle('Waivers_2_Triage');
+        
+        // 2. Grab the actual file
+        const fileHandle = await triageFolder.getFileHandle(item["File Name"]);
+        const file = await fileHandle.getFile();
+        
+        // 3. Create a temporary, secure browser URL and display it
+        const fileURL = URL.createObjectURL(file);
+        frame.src = fileURL;
+        
+    } catch (error) {
+        console.warn("Could not load preview. The file might be missing from Triage.", error);
+        frame.src = "about:blank"; 
+    }
 
     document.getElementById('aqApproveBtn').disabled = false;
     document.getElementById('aqRejectBtn').disabled = false;
