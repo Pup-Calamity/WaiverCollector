@@ -134,24 +134,40 @@ async function UpdateExcel(fileHandle, changedRows, uniqueIdKey, sheetName = "Sh
         console.error("Failed to merge and save:", error);
     }
 }
-//Update the excel sheet
 async function writeDataToExcel(fileHandle, jsonData, sheetName = "Sheet1") {
     try {
-        // 1. Convert the JavaScript array back into a SheetJS worksheet
-        const newWorksheet = XLSX.utils.json_to_sheet(jsonData);
+        // 1. Read the existing file back into memory so we keep its workbook structure & tables
+        const file = await fileHandle.getFile();
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array' });
         
-        // 2. Create a new blank workbook and attach the worksheet
-        const newWorkbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, sheetName);
+        // 2. Determine the correct target sheet name
+        let targetSheetName = sheetName;
+        if (!workbook.Sheets[targetSheetName]) {
+            targetSheetName = workbook.SheetNames[0] || "Sheet1";
+        }
         
-        // 3. Package the workbook into an ArrayBuffer (binary data)
-        const excelBuffer = XLSX.write(newWorkbook, { bookType: 'xlsx', type: 'array' });
+        const worksheet = workbook.Sheets[targetSheetName];
+
+        // 3. Clear out old cell data safely
+        // (We blank the range so old ghost rows don't linger if the dataset shrinks)
+        if (worksheet['!ref']) {
+            const range = XLSX.utils.decode_range(worksheet['!ref']);
+            for (let R = range.s.r; R <= range.e.r; ++R) {
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                    delete worksheet[cellAddress];
+                }
+            }
+        }
+
+        // 4. In-place update: Write the new JSON array directly into the existing sheet
+        XLSX.utils.sheet_add_json(worksheet, jsonData, { skipHeader: false, origin: "A1" });
+
+        // 5. Package and write back out while preserving original table/workbook XML structure
+        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
         
-        // 4. Request write access from the File System Access API
-        // This creates a temporary swap file to ensure safe overwriting
         const writableStream = await fileHandle.createWritable();
-        
-        // 5. Write the data and close the stream to apply the changes
         await writableStream.write(excelBuffer);
         await writableStream.close();
         
