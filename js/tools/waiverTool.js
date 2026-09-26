@@ -4,7 +4,6 @@
 // 1. SHARED UTILITIES & ROUTING MODULE
 // ==========================================
 
-// Completely stripped of C/U/F prefixes. 1 Row = 1 Draw.
 function generateWaiverKey(jobId, vendorId, month, year) {
     const baseKey = `${String(jobId).trim()}${String(vendorId).trim()}${String(month).trim()}${String(year).trim()}`;
     const matchingCount = (window.Workspace.appData.waivers || []).filter(w => String(w["Waiver ID"]).startsWith(baseKey)).length;
@@ -29,33 +28,26 @@ function calculatePeriodDates(targetMonth, targetYear, ruleType, throughDayStr) 
     return { startDay, endingDay, waiverMonthInt: mathMonth + 1 };
 }
 
-// Single source of truth for folder names and file names
 function getWaiverRoutingInfo(jobId, vendorId, targetMonth, targetYear, endingDay, typeLabel) {
     let vendorName = vendorId;
     try { vendorName = WaiverMath.getEmailInfo(jobId, vendorId, "Vendor Name") || vendorId; } catch(e) {}
     
-    // Sanitize string to prevent OS save crashes
     const cleanVendorName = vendorName.replace(/[^a-zA-Z0-9 -]/g, "").trim() || vendorId;
     
-    // Format dates for file naming
     const waiverYear4 = String(endingDay.getFullYear());
     const waiverYear2 = waiverYear4.slice(-2);
     const formattedWaiverMonth = String(endingDay.getMonth() + 1).padStart(2, '0');    
     
-    // Use the actual Waiver Date for the folder, not the Pay App date
     const periodFolderName = `${formattedWaiverMonth}-${waiverYear4}`;
-    
-    // Creates the base name: JobID-MMYY_VendorName
     const baseFileName = `${jobId}-${formattedWaiverMonth}${waiverYear2}_${cleanVendorName}`;
 
-    // Look up BURG
     const jobInfo = window.Workspace.appData.jobInfo || [];
     const jobData = jobInfo.find(j => String(j["Job ID"]).trim().toLowerCase() === String(jobId).trim().toLowerCase()) || {};
     const burgName = String(jobData["BURG Name"] || "Unknown Burg").trim().replace(/[^a-zA-Z0-9 -]/g, "");
 
     return {
         vendorName,
-        burgName, 
+        burgName,
         periodFolderName,
         reqFileName: `${baseFileName}_${typeLabel}_req.pdf`,
         recFileName: `${baseFileName}_${typeLabel}_rec.pdf`,
@@ -150,12 +142,10 @@ async function validateWaiverRun(waiverIds, isFinal = false) {
 // 3. CORE ENGINES
 // ==========================================
 
-// --- Invoice Gathering Helper ---
 function promptForInvoices(uniqueJobs) {
     return new Promise((resolve) => {
         const jobString = `(${uniqueJobs.join(',')})`;
         
-        // Auto-copy to clipboard immediately
         navigator.clipboard.writeText(jobString).catch(e => console.warn("Clipboard auto-copy blocked by browser.", e));
 
         const dialog = document.createElement('dialog');
@@ -181,24 +171,22 @@ function promptForInvoices(uniqueJobs) {
         document.body.appendChild(dialog);
         dialog.showModal();
 
-        // Fallback manual copy (just in case the browser blocked the auto-copy)
         const copyBox = dialog.querySelector('#copyBox');
         copyBox.addEventListener('click', () => {
             navigator.clipboard.writeText(jobString);
             const oldBg = copyBox.style.backgroundColor;
-            copyBox.style.backgroundColor = "#dcfce7"; // Flash green to confirm
+            copyBox.style.backgroundColor = "#dcfce7"; 
             setTimeout(() => copyBox.style.backgroundColor = oldBg, 200);
         });
 
         dialog.querySelector('#cancelInvoiceBtn').addEventListener('click', () => {
             document.body.removeChild(dialog);
-            resolve(null); // Return null to indicate cancellation
+            resolve(null); 
         });
 
         dialog.querySelector('#continueInvoiceBtn').addEventListener('click', async () => {
             document.body.removeChild(dialog);
             try {
-                // Trigger the native file picker
                 const [fileHandle] = await window.showOpenFilePicker({
                     types: [{ description: 'Invoice Files', accept: {'*/*': []} }],
                     multiple: false
@@ -220,7 +208,6 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
     const validationReport = await validateWaiverRun(waiverIds, isFinal);
     if (!validationReport.passed) return alert("Pre-Check Failed:\n\n" + validationReport.errors.join("\n"));
 
-    // Extract unique jobs from the validated records
     const uniqueJobs = [...new Set(validationReport.validRecords.map(item => String(item.record["Job ID"]).trim()))];
     const invoiceFileHandle = await promptForInvoices(uniqueJobs);
     
@@ -234,7 +221,6 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
         const file = await invoiceFileHandle.getFile();
         const arrayBuffer = await file.arrayBuffer();
 
-        // Parse the Excel file using SheetJS
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
         const sheetName = workbook.SheetNames[0]; 
         const newInvoiceData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
@@ -244,7 +230,6 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
             return;
         }
 
-        // Replace the table strictly in live memory for this run
         window.Workspace.appData.waiverInvoices = newInvoiceData;
         logMsg(`Successfully loaded ${newInvoiceData.length} invoice rows into temporary memory.`);
 
@@ -252,7 +237,6 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
         alert("CRITICAL ERROR: Failed to process the invoice file.\n\n" + err.message);
         return;
     }
-    // --------------------------------------------------
 
     const templatesDir = await window.Workspace.dirHandle.getDirectoryHandle('Templates', { create: true });
     const emailsDir = await window.Workspace.dirHandle.getDirectoryHandle('Generated_Emails', { create: true });
@@ -271,7 +255,6 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
 
         if (String(WaiverMath.getEmailInfo(jobId, vendorId, "Manual Only")).trim().toLowerCase() === "yes") continue;
 
-        // --- NEW: The 48-hour urgency date (stamped on PDF and Email) ---
         const vendorDueDate = new Date();
         vendorDueDate.setDate(vendorDueDate.getDate() + 2);
 
@@ -279,7 +262,6 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
         let allZeroBalance = true; 
         let finalPeriodString = "", finalWaiverMonthInt = "", finalEmailFileName = "";
 
-        // Loop over the templates (Creates 1 or 2 PDFs for this single row)
         for (const templateData of requiredTemplates) {
             const { type: waiverType, name: templateName, rule: timingRule } = templateData;
             const { startDay, endingDay, waiverMonthInt } = calculatePeriodDates(targetMonth, targetYear, timingRule, jobSettings["Through Day"] || 31);
@@ -289,11 +271,10 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
 
             let finalAmount = WaiverMath.getAmount(jobId, vendorId, startDay, endingDay, isFinal, "<>");
 
-            // If ANY template has a balance, the row is not completely zero.
             if (parseFloat(finalAmount.replace(/,/g, '')) > 0 || String(jobSettings["Skip Zero"]).toLowerCase() !== "yes") {
                 allZeroBalance = false;
             } else {
-                continue; // Skip stamping this specific PDF if it's 0 and allowed
+                continue; 
             }
 
             if (isManualAmount) {
@@ -313,7 +294,6 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
                 
                 const { startDay: prevStartDay, endingDay: prevEndDay } = calculatePeriodDates(targetMonth, targetYear, "trailing", jobSettings["Through Day"] || 31);
                 
-                // --- NEW BARCODE FORMATTING ---
                 let payAppM = String(targetMonth).trim().padStart(2, '0');
                 let payAppY = String(targetYear).trim();
                 let wvrM = String(waiverMonthInt).trim().padStart(2, '0');
@@ -324,7 +304,6 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
                 }
 
                 const formattedBarcode = `${jobId} ${vendorId.padStart(10, '0')} ${payAppM} ${payAppY} |${wvrM} ${wvrY} ${typeLabel}`;
-                // ------------------------------
 
                 const mappingData = {
                     "amount": finalAmount, "amountWords": WaiverMath.spellNumber(finalAmount),
@@ -346,7 +325,7 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
                     "startdate": startDay.toLocaleDateString(), "throughDate": endingDay.toLocaleDateString(),
                     "paidThruDate": new Date(startDay.getTime() - 86400000).toLocaleDateString(), 
                     "day": endingDay.getDate().toString(), "month": endingDay.toLocaleString('default', { month: 'long' }), "year": endingDay.getFullYear().toString(),
-                    "dueDate": vendorDueDate.toLocaleDateString(), // <--- Uses 48-Hour Urgency Date here
+                    "dueDate": vendorDueDate.toLocaleDateString(), 
                     "barcode": formattedBarcode
                 };
 
@@ -354,8 +333,8 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
                 const configJson = JSON.parse(await (await templatesDir.getFileHandle(`${templateName}_Config.json`)).getFile().then(f => f.text()));
                 const newPdfBytes = await stampWaiverWithConfig(pdfBuffer, mappingData, configJson);
                 
+                // FUZZY FOLDER ROUTING
                 const waiversBase = await window.Workspace.dirHandle.getDirectoryHandle("Waivers", { create: true });
-                
                 let burgFolder = null;
                 for await (const entry of waiversBase.values()) {
                     if (entry.kind === 'directory' && entry.name.toLowerCase().includes(routing.burgName.toLowerCase())) {
@@ -380,7 +359,6 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
             }
         }
 
-        // --- SINGLE ROW UPDATE ---
         const todayStr = new Date().toLocaleDateString();
 
         if (allZeroBalance) {
@@ -388,7 +366,6 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
                 "Status": "Received", "Received Date": todayStr, "Sent Date": todayStr, 
                 "Through Period": finalPeriodString, "Waiver Month": finalWaiverMonthInt,
                 "Notes": `Auto-cleared: $0 balance for period.`
-                // Due Date intentionally omitted
             });
             recordsToUpdate.push(record);
             skippedZeroCount++;
@@ -404,12 +381,10 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
                 "Updated By": window.Workspace?.currentUser?.name || "System",
                 "Action Date": actionDate.toLocaleDateString(),
                 "Sent Date": todayStr, "Status": "Sent", "Through Period": finalPeriodString
-                // Due Date intentionally omitted (Managed by Status Updater)
             });
             recordsToUpdate.push(record);
             successCount++;
 
-            // Email Generation
             const vendorEmail = WaiverMath.getEmailInfo(jobId, vendorId, "Region Email");
             const vendorName = WaiverMath.getEmailInfo(jobId, vendorId, "Vendor Name");
             const emailFileName = getWaiverRoutingInfo(jobId, vendorId, targetMonth, targetYear, new Date(), "").emailFileName;
@@ -440,7 +415,6 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
 window.processReturnedWaivers = async function(waiverIds) {
     if (!waiverIds?.length) return;
     
-    // Validate the rows first to know exactly what PDFs the contract demands
     const validationReport = await validateWaiverRun(waiverIds); 
     let recordsToUpdate = [], count = 0;
 
@@ -453,7 +427,6 @@ window.processReturnedWaivers = async function(waiverIds) {
         let allRequiredFilesFound = true;
         let finalVendorNameDisplay = vendor;
 
-        // Loop through EVERY template required by the contract and demand its file
         for (const templateData of requiredTemplates) {
             const { type: waiverType, rule: timingRule } = templateData;
             
@@ -465,7 +438,6 @@ window.processReturnedWaivers = async function(waiverIds) {
             finalVendorNameDisplay = routing.vendorName;
 
             try {
-                try {
                 const waiversBase = await window.Workspace.dirHandle.getDirectoryHandle("Waivers");
                 
                 let burgFolder = null;
@@ -475,7 +447,7 @@ window.processReturnedWaivers = async function(waiverIds) {
                         break;
                     }
                 }
-                if (!burgFolder) burgFolder = await waiversBase.getDirectoryHandle(routing.burgName); // Fallback lookup
+                if (!burgFolder) burgFolder = await waiversBase.getDirectoryHandle(routing.burgName);
                 
                 const jobDir = await burgFolder.getDirectoryHandle(job);
                 const dir = await jobDir.getDirectoryHandle(routing.periodFolderName);
@@ -483,22 +455,21 @@ window.processReturnedWaivers = async function(waiverIds) {
                 while (true) {
                     try { 
                         await dir.getFileHandle(routing.recFileName); 
-                        break; // Success! It found this specific required file.
+                        break; 
                     } catch { 
-                        if (!confirm(`Looking for ${waiverType} waiver...\n\nPlease place file here:\nWaivers \\ ${job} \\ ${routing.periodFolderName} \\\n\nName exactly: ${routing.recFileName}\n\nPress OK when ready, or Cancel to skip this vendor.`)) {
+                        if (!confirm(`Looking for ${waiverType} waiver...\n\nPlease place file here:\nWaivers \\ ${routing.burgName} \\ ${job} \\ ${routing.periodFolderName} \\\n\nName exactly: ${routing.recFileName}\n\nPress OK when ready, or Cancel to skip this vendor.`)) {
                             allRequiredFilesFound = false;
                             throw "skip"; 
                         }
                     }
                 }
             } catch (e) { 
-                if (e === "skip") break; // Breaks out of the template loop if they cancelled
+                if (e === "skip") break; 
                 console.error(e); 
                 allRequiredFilesFound = false;
             }
         }
 
-        // Only update Excel if they successfully provided ALL required PDFs for the draw
         if (allRequiredFilesFound) {
             const date = prompt(`All waivers found! Received date for ${finalVendorNameDisplay}?`, new Date().toLocaleDateString());
             if (!date) continue;

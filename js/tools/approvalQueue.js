@@ -336,18 +336,17 @@ async function routeFileLocally(fileName, targetJob, vendorId, waiverMonth, waiv
         const jobData = jobInfo.find(j => String(j["Job ID"]).trim().toLowerCase() === String(targetJob).toLowerCase()) || {};
         let burgName = String(jobData["BURG Name"] || "Unknown Burg").trim().replace(/[^a-zA-Z0-9 -]/g, "");
 
-        // 3. Format Strings (e.g. Folder: 08-2026 | File: 21587-0826_Buckeye...)
+        // 3. Format Strings
         const formattedWMonth = String(waiverMonth).padStart(2, '0');
         const wYear4 = String(waiverYear);
         const wYear2 = wYear4.slice(-2);
 
-        const folderName = `${formattedWMonth}-${wYear4}`; // Waivers go into the Waiver Date folder, not Pay App
+        const folderName = `${formattedWMonth}-${wYear4}`; 
         const newFileName = `${targetJob}-${formattedWMonth}${wYear2}_${cleanVendorName}_${waiverType}_rec.pdf`;
 
         // 4. Drill down: Waivers -> BURG -> JobID -> MM-YYYY
         const waiversBase = await window.Workspace.dirHandle.getDirectoryHandle("Waivers", { create: true });
         
-        // Loop through the Waivers folder to find a Burg folder that contains the name
         let burgFolder = null;
         for await (const entry of waiversBase.values()) {
             if (entry.kind === 'directory' && entry.name.toLowerCase().includes(burgName.toLowerCase())) {
@@ -356,7 +355,6 @@ async function routeFileLocally(fileName, targetJob, vendorId, waiverMonth, waiv
             }
         }
         
-        // Fallback: If no folder contains the name, create a clean one
         if (!burgFolder) {
             burgFolder = await waiversBase.getDirectoryHandle(burgName, { create: true });
         }
