@@ -356,18 +356,76 @@ window.addEventListener('DOMContentLoaded', () => {
     const cancelJobBtn = document.getElementById('cancelNewJobBtn');
     const jobForm = document.getElementById('setupJobForm');
     const jobIdInput = document.getElementById('njJobId');
+    const addVendorBtn = document.getElementById('addVendorRowBtn');
+    const vendorContainer = document.getElementById('vendorRowsContainer');
+
+    function createVendorRow() {
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'vendor-row';
+        rowDiv.style.cssText = "background: var(--bg-color); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 6px;";
+        
+        rowDiv.innerHTML = `
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1.2fr 1fr 30px; gap: 6px; align-items: center;">
+                <input type="text" class="v-id" placeholder="Vendor ID *" style="margin:0; padding:6px; font-size:0.85em;" required>
+                <input type="text" class="v-reg" placeholder="Region" value="1" style="margin:0; padding:6px; font-size:0.85em;">
+                <input type="text" class="v-amt" placeholder="Contract Amount" style="margin:0; padding:6px; font-size:0.85em;">
+                <input type="text" class="v-desc" placeholder="Contract Description" style="margin:0; padding:6px; font-size:0.85em;">
+                <input type="date" class="v-date" style="margin:0; padding:5px; font-size:0.85em;" title="Contract Date">
+                <button type="button" class="remove-vendor-btn" style="background: transparent; border: none; color: #ef4444; font-size: 1.2em; cursor: pointer; font-weight: bold;" title="Remove Vendor">×</button>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr; gap: 6px;">
+                <input type="text" class="v-owner" placeholder="Owner Name" style="margin:0; padding:5px; font-size:0.8em;">
+                <input type="text" class="v-gcname" placeholder="GC Name" style="margin:0; padding:5px; font-size:0.8em;">
+                <input type="text" class="v-gcnum" placeholder="GC Numbers" style="margin:0; padding:5px; font-size:0.8em;">
+                <input type="text" class="v-tier" placeholder="Third Tier (Hiring)" style="margin:0; padding:5px; font-size:0.8em;">
+                <input type="text" class="v-cc" placeholder="Special CCs (;)" style="margin:0; padding:5px; font-size:0.8em;">
+                <select class="v-manual" style="margin:0; padding:5px; font-size:0.8em;">
+                    <option value="">Manual Only: No</option>
+                    <option value="Yes">Manual Only: Yes</option>
+                </select>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;">
+                <input type="text" class="v-cond" placeholder="Conditional Template" value="Standard_Cond" style="margin:0; padding:5px; font-size:0.8em;">
+                <input type="text" class="v-uncond" placeholder="Unconditional Template" value="Standard_Uncond" style="margin:0; padding:5px; font-size:0.8em;">
+                <input type="text" class="v-final" placeholder="Final Template" value="Standard_Final" style="margin:0; padding:5px; font-size:0.8em;">
+            </div>
+            <input type="text" class="v-note" placeholder="Special Email Note (optional)..." style="margin:0; padding:5px; font-size:0.8em; width:100%;">
+        `;
+
+        rowDiv.querySelector('.remove-vendor-btn').addEventListener('click', () => {
+            if (vendorContainer.children.length > 1) {
+                rowDiv.remove();
+            } else {
+                alert("You must keep at least one vendor row.");
+            }
+        });
+
+        vendorContainer.appendChild(rowDiv);
+    }
 
     if (openJobBtn) {
         openJobBtn.addEventListener('click', () => {
             document.getElementById('njJobId').value = "";
             document.getElementById('njJobName').value = "";
-            document.getElementById('njVendorId').value = "";
-            document.getElementById('njContractAmt').value = "";
-            document.getElementById('njCondTemp').value = "Standard_Cond";
-            document.getElementById('njUncondTemp').value = "Standard_Uncond";
-            document.getElementById('njFinalTemp').value = "Standard_Final";
+            document.getElementById('njJobStreet').value = "";
+            document.getElementById('njJobCity').value = "";
+            document.getElementById('njJobState').value = "";
+            document.getElementById('njJobZip').value = "";
+            document.getElementById('njJobCounty').value = "";
+            document.getElementById('njDueDay').value = "25";
+            document.getElementById('njThroughDay').value = "31";
+            document.getElementById('njSkipZero').value = "";
+            document.getElementById('njValueIf0').value = "";
+            
+            vendorContainer.innerHTML = "";
+            createVendorRow();
+
             if (jobModal) jobModal.showModal();
         });
+    }
+
+    if (addVendorBtn) {
+        addVendorBtn.addEventListener('click', () => createVendorRow());
     }
 
     if (cancelJobBtn) {
@@ -386,12 +444,26 @@ window.addEventListener('DOMContentLoaded', () => {
             const foundJob = jobInfoData.find(j => String(j["Job ID"] || "").trim().toLowerCase() === enteredId);
 
             if (foundJob) {
-                // Pre-fill from ERP data, but leave inputs completely open for user overwrite
-                const jobNameField = document.getElementById('njJobName');
-                if (jobNameField && !jobNameField.value) {
-                    jobNameField.value = foundJob["Job Name"] || "";
-                }
-                console.log(`💡 ERP Auto-Reference: Found match for Job ID ${enteredId}. Fields pre-filled.`);
+                const setValIfEmpty = (elementId, value) => {
+                    const el = document.getElementById(elementId);
+                    if (el && !el.value) el.value = value || "";
+                };
+
+                // Map standard ERP fields
+                setValIfEmpty('njJobName', foundJob["Job Name"]);
+                setValIfEmpty('njJobStreet', foundJob["Job Address 1"]);
+                setValIfEmpty('njJobCity', foundJob["Job City"]);
+                setValIfEmpty('njJobState', foundJob["Job State"]);
+                setValIfEmpty('njJobZip', foundJob["Job Zip"]);
+
+                // Auto-fill owner name on active vendor rows from Customer Name if blank
+                const customerName = foundJob["Customer Name"] || "";
+                document.querySelectorAll('.vendor-row').forEach(row => {
+                    const ownerInput = row.querySelector('.v-owner');
+                    if (ownerInput && !ownerInput.value) ownerInput.value = customerName;
+                });
+
+                console.log(`💡 ERP Auto-Reference: Pre-filled project details for Job ID ${enteredId}.`);
             }
         });
     }
@@ -400,95 +472,105 @@ window.addEventListener('DOMContentLoaded', () => {
         jobForm.addEventListener('submit', async () => {
             const jobId = document.getElementById('njJobId').value.trim();
             const jobName = document.getElementById('njJobName').value.trim(); 
+            const jobStreet = document.getElementById('njJobStreet').value.trim();
+            const jobCity = document.getElementById('njJobCity').value.trim();
+            const jobState = document.getElementById('njJobState').value.trim();
+            const jobZip = document.getElementById('njJobZip').value.trim();
+            const jobCounty = document.getElementById('njJobCounty').value.trim();
+
             const dueDay = document.getElementById('njDueDay').value.trim();
             const throughDay = document.getElementById('njThroughDay').value.trim();
             const condRule = document.getElementById('njCondRule').value.trim();
             const uncondRule = document.getElementById('njUncondRule').value.trim();
-
-            const vendorId = document.getElementById('njVendorId').value.trim();
-            const vendorRegion = document.getElementById('njVendorRegion').value.trim();
-            const contractAmt = document.getElementById('njContractAmt').value.trim();
-            const condTemp = document.getElementById('njCondTemp').value.trim();
-            const uncondTemp = document.getElementById('njUncondTemp').value.trim();
-            const finalTemp = document.getElementById('njFinalTemp').value.trim();
+            const skipZero = document.getElementById('njSkipZero').value.trim();
+            const valueIf0 = document.getElementById('njValueIf0').value.trim();
 
             if (!jobId) return alert("Job ID is required.");
+
+            const vendorRows = document.querySelectorAll('.vendor-row');
+            let newContracts = [];
+
+            for (const row of vendorRows) {
+                const vId = row.querySelector('.v-id').value.trim();
+                if (!vId) continue;
+
+                newContracts.push({
+                    "Key": `${jobId}-${vId}`,
+                    "Vendor ID": vId,
+                    "Vendor Region": row.querySelector('.v-reg').value.trim() || "1",
+                    "Vendor Name": "",
+                    "Job ID": jobId,
+                    "Job Name": jobName,
+                    "Owner": row.querySelector('.v-owner').value.trim(),
+                    "GC Name": row.querySelector('.v-gcname').value.trim(),
+                    "GC Numbers": row.querySelector('.v-gcnum').value.trim(),
+                    "Job Street": jobStreet,
+                    "Job City": jobCity,
+                    "Job State": jobState,
+                    "Job Zip": jobZip,
+                    "Job County": jobCounty,
+                    "Contract Description": row.querySelector('.v-desc').value.trim(),
+                    "Contract Date": row.querySelector('.v-date').value.trim(),
+                    "Contract Amount": row.querySelector('.v-amt').value.trim(),
+                    "Third Tier": row.querySelector('.v-tier').value.trim(),
+                    "CC": row.querySelector('.v-cc').value.trim(),
+                    "Special Email Note": row.querySelector('.v-note').value.trim(),
+                    "Contract Note": "",
+                    "Invoice Reference": "",
+                    "Conditional Template": row.querySelector('.v-cond').value.trim(),
+                    "Unconditional Template": row.querySelector('.v-uncond').value.trim(),
+                    "Conditional Final Template": "",
+                    "Final Template": row.querySelector('.v-final').value.trim(),
+                    "Final Collected": "",
+                    "Final Date": "",
+                    "Manual Only": row.querySelector('.v-manual').value
+                });
+            }
+
+            if (newContracts.length === 0) {
+                return alert("Please enter at least one valid Vendor ID.");
+            }
 
             const saveBtn = document.getElementById('saveNewJobBtn');
             saveBtn.textContent = "Saving...";
             saveBtn.disabled = true;
 
             try {
-                // 1. Build Job Notes Record
+                // 1. Build Job Notes Record including Skip Zero & ValueIf0
                 const newJobNoteRow = {
                     "Job ID": jobId,
                     "Conditional": condRule,
                     "Unconditional": uncondRule,
                     "Waiver Due Day": dueDay,
                     "Through Day": throughDay,
-                    "Skip Zero": "",
-                    "Notes": "",
+                    "Skip Zero": skipZero,
+                    "Notes": valueIf0 ? `ValueIf0: ${valueIf0}` : "",
                     "Collection Notes": ""
                 };
 
-                // 2. Build Contract Info Record
-                let newContractRow = null;
-                if (vendorId) {
-                    newContractRow = {
-                        "Key": `${jobId}-${vendorId}`,
-                        "Vendor ID": vendorId,
-                        "Vendor Region": vendorRegion,
-                        "Vendor Name": "",
-                        "Job ID": jobId,
-                        "Job Name": jobName, // Custom or ERP-derived value
-                        "Owner": "",
-                        "GC Name": "",
-                        "GC Numbers": "",
-                        "Job Street": "",
-                        "Job City": "",
-                        "Job State": "",
-                        "Job Zip": "",
-                        "Job County": "",
-                        "Contract Description": "",
-                        "Contract Date": "",
-                        "Contract Amount": contractAmt,
-                        "Third Tier": "",
-                        "CC": "",
-                        "Special Email Note": "",
-                        "Contract Note": "",
-                        "Invoice Reference": "",
-                        "Conditional Template": condTemp,
-                        "Unconditional Template": uncondTemp,
-                        "Conditional Final Template": "",
-                        "Final Template": finalTemp,
-                        "Final Collected": "",
-                        "Final Date": "",
-                        "Manual Only": ""
-                    };
-                }
-
-                // 3. Save to Job Notes Excel (Writable Master Data)
+                // 2. Save Job Notes to Excel
                 if (!window.Workspace.appData.jobNotes) window.Workspace.appData.jobNotes = [];
                 window.Workspace.appData.jobNotes.push(newJobNoteRow);
                 const jobNotesHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.jobNotes);
                 if (jobNotesHandle) await UpdateExcel(jobNotesHandle, [newJobNoteRow], "Job ID", "Job Notes");
 
-                // 4. Save to Contract Info Excel (Writable Master Data)
-                if (newContractRow) {
-                    if (!window.Workspace.appData.contractInfo) window.Workspace.appData.contractInfo = [];
-                    window.Workspace.appData.contractInfo.push(newContractRow);
-                    const contractHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.contractInfo);
-                    if (contractHandle) await UpdateExcel(contractHandle, [newContractRow], "Key", "Contract Info");
+                // 3. Batch Save Contracts to Excel
+                if (!window.Workspace.appData.contractInfo) window.Workspace.appData.contractInfo = [];
+                window.Workspace.appData.contractInfo.push(...newContracts);
+                
+                const contractHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.contractInfo);
+                if (contractHandle) {
+                    await UpdateExcel(contractHandle, newContracts, "Key", "Contract Info");
                 }
 
                 jobModal.close();
-                alert(`Successfully initialized Job ${jobId} rules and contract data!`);
+                alert(`Successfully initialized Job ${jobId} rules, address fields, and ${newContracts.length} vendor contract(s)!`);
 
             } catch (err) {
                 console.error("Failed to setup new job:", err);
                 alert("Error saving job configuration. Check console.");
             } finally {
-                saveBtn.textContent = "Save Job & Contract";
+                saveBtn.textContent = "Save Job & Contracts";
                 saveBtn.disabled = false;
             }
         });

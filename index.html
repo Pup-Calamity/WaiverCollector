@@ -267,87 +267,98 @@
         </div>
     </dialog>
 
-    <!-- Setup New Job Modal -->
-    <dialog id="setupJobModal" style="padding: 25px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--surface-color); width: 600px; box-shadow: var(--card-shadow); color: var(--text-main);">
-        <h3 style="margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">➕ Initialize New Job & Vendor Contracts</h3>
-        <p style="font-size: 0.9em; color: var(--text-muted); margin-bottom: 20px;">Configure job-level billing rules and add initial vendor contract parameters.</p>
+    <dialog id="setupJobModal" style="padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--surface-color); width: 750px; max-height: 90vh; overflow-y: auto; box-shadow: var(--card-shadow); color: var(--text-main);">
+        <h3 style="margin-top: 0; margin-bottom: 8px; font-size: 1.2em; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">➕ Initialize New Job & Contracts</h3>
+        <p style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 15px;">Configure job billing settings, project details, and add one or multiple vendor contracts.</p>
         
         <form id="setupJobForm" onsubmit="event.preventDefault();">
-            <h4 style="margin: 0 0 10px 0; color: var(--brand-color);">1. Job & Billing Rules (Job Notes & Info)</h4>
-            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 15px; margin-bottom: 15px;">
+            <!-- Section 1: Job Notes & Project Defaults -->
+            <h4 style="margin: 0 0 8px 0; font-size: 0.95em; color: var(--brand-color);">1. Job-Level Rules & Location (Job Notes & ERP Auto-Fill)</h4>
+            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 10px; margin-bottom: 10px;">
                 <div>
-                    <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Job ID *</label>
-                    <input type="text" id="njJobId" placeholder="e.g. 21587" required style="margin: 0; padding: 10px;">
+                    <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Job ID *</label>
+                    <input type="text" id="njJobId" placeholder="e.g. 21587" required style="margin: 0; padding: 8px;">
                 </div>
                 <div>
-                    <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Job Name</label>
-                    <input type="text" id="njJobName" placeholder="e.g. Riverfront Plaza" style="margin: 0; padding: 10px;">
+                    <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Job Name (ERP Lookup)</label>
+                    <input type="text" id="njJobName" placeholder="e.g. Riverfront Plaza" style="margin: 0; padding: 8px;">
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; background: var(--bg-color); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+            <!-- Job Address Fields (Auto-filled from ERP jobInfo if available) -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
                 <div>
-                    <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Waiver Due Day</label>
-                    <input type="number" id="njDueDay" value="25" style="margin: 0; padding: 8px;">
+                    <input type="text" id="njJobStreet" placeholder="Job Street" style="margin: 0; padding: 6px; font-size: 0.85em;">
                 </div>
                 <div>
-                    <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Through Day</label>
-                    <input type="number" id="njThroughDay" value="31" style="margin: 0; padding: 8px;">
+                    <input type="text" id="njJobCity" placeholder="City" style="margin: 0; padding: 6px; font-size: 0.85em;">
                 </div>
                 <div>
-                    <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Conditional Rule</label>
-                    <select id="njCondRule" style="margin: 0; padding: 8px;">
+                    <input type="text" id="njJobState" placeholder="State" style="margin: 0; padding: 6px; font-size: 0.85em;">
+                </div>
+                <div>
+                    <input type="text" id="njJobZip" placeholder="Zip" style="margin: 0; padding: 6px; font-size: 0.85em;">
+                </div>
+                <div>
+                    <input type="text" id="njJobCounty" placeholder="County" style="margin: 0; padding: 6px; font-size: 0.85em;">
+                </div>
+            </div>
+
+            <!-- Job Notes Settings: Due Day, Through Day, Rules, Skip Zero, ValueIf0 -->
+            <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 15px; background: var(--bg-color); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div>
+                    <label style="font-size: 0.7em; font-weight: bold; color: var(--text-muted);">Due Day</label>
+                    <input type="number" id="njDueDay" value="25" style="margin: 0; padding: 6px; font-size: 0.85em;">
+                </div>
+                <div>
+                    <label style="font-size: 0.7em; font-weight: bold; color: var(--text-muted);">Through Day</label>
+                    <input type="number" id="njThroughDay" value="31" style="margin: 0; padding: 6px; font-size: 0.85em;">
+                </div>
+                <div>
+                    <label style="font-size: 0.7em; font-weight: bold; color: var(--text-muted);">Cond Rule</label>
+                    <select id="njCondRule" style="margin: 0; padding: 6px; font-size: 0.8em;">
                         <option value="trailing">Trailing</option>
                         <option value="current">Current</option>
                     </select>
                 </div>
                 <div>
-                    <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Unconditional Rule</label>
-                    <select id="njUncondRule" style="margin: 0; padding: 8px;">
+                    <label style="font-size: 0.7em; font-weight: bold; color: var(--text-muted);">Uncond Rule</label>
+                    <select id="njUncondRule" style="margin: 0; padding: 6px; font-size: 0.8em;">
                         <option value="trailing">Trailing</option>
                         <option value="current">Current</option>
                     </select>
                 </div>
-            </div>
-
-            <h4 style="margin: 0 0 10px 0; color: var(--brand-color);">2. Initial Vendor Contract (Contract Info)</h4>
-            <div style="display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 10px; margin-bottom: 15px;">
                 <div>
-                    <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Vendor ID *</label>
-                    <input type="text" id="njVendorId" placeholder="e.g. 36046" style="margin: 0; padding: 10px;">
+                    <label style="font-size: 0.7em; font-weight: bold; color: var(--text-muted);">Skip $0?</label>
+                    <select id="njSkipZero" style="margin: 0; padding: 6px; font-size: 0.8em;">
+                        <option value="">No</option>
+                        <option value="Yes">Yes</option>
+                    </select>
                 </div>
                 <div>
-                    <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Vendor Region</label>
-                    <input type="text" id="njVendorRegion" value="1" style="margin: 0; padding: 10px;">
-                </div>
-                <div>
-                    <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Contract Amount ($)</label>
-                    <input type="text" id="njContractAmt" placeholder="0.00" style="margin: 0; padding: 10px;">
+                    <label style="font-size: 0.7em; font-weight: bold; color: var(--text-muted);">ValueIf0 ($)</label>
+                    <input type="text" id="njValueIf0" placeholder="e.g. 10.00" style="margin: 0; padding: 6px; font-size: 0.85em;">
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 25px;">
-                <div>
-                    <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Conditional Template</label>
-                    <input type="text" id="njCondTemp" placeholder="Standard_Cond" style="margin: 0; padding: 10px;">
-                </div>
-                <div>
-                    <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Unconditional Template</label>
-                    <input type="text" id="njUncondTemp" placeholder="Standard_Uncond" style="margin: 0; padding: 10px;">
-                </div>
-                <div>
-                    <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Final Template</label>
-                    <input type="text" id="njFinalTemp" placeholder="Standard_Final" style="margin: 0; padding: 10px;">
-                </div>
+            <!-- Section 2: Vendor Contracts -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h4 style="margin: 0; font-size: 0.95em; color: var(--brand-color);">2. Vendor Contracts & Project Metadata (Contract Info)</h4>
+                <button type="button" id="addVendorRowBtn" style="background: var(--surface-color); border: 1px solid var(--border-color); color: var(--brand-color); border-radius: 4px; padding: 4px 10px; font-size: 0.8em; cursor: pointer; font-weight: bold;">+ Add Vendor</button>
             </div>
 
-            <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                <button type="button" id="cancelNewJobBtn" class="primary-btn" style="width: auto; background: transparent; color: var(--text-main); border: 1px solid var(--border-color);">Cancel</button>
-                <button type="submit" id="saveNewJobBtn" class="primary-btn" style="width: auto; background: #6366f1;">Save Job & Contract</button>
+            <!-- Dynamic Vendor Rows Container -->
+            <div id="vendorRowsContainer" style="display: flex; flex-direction: column; gap: 10px; max-height: 250px; overflow-y: auto; margin-bottom: 20px; padding-right: 4px;">
+                <!-- Injected via JS -->
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" id="cancelNewJobBtn" class="primary-btn" style="width: auto; padding: 8px 12px; background: transparent; color: var(--text-main); border: 1px solid var(--border-color);">Cancel</button>
+                <button type="submit" id="saveNewJobBtn" class="primary-btn" style="width: auto; padding: 8px 14px; background: #6366f1;">Save Job & Contracts</button>
             </div>
         </form>
     </dialog>
-
+    
     <!-- Batch Processing Settings Modal -->
     <dialog id="batchSettingsModal" style="padding: 25px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--surface-color); width: 450px; box-shadow: var(--card-shadow);">
         <h3 style="margin-top: 0; color: var(--text-main); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">Batch Processing Settings</h3>
