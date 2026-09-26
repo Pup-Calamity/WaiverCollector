@@ -5,7 +5,8 @@
 // ==========================================
 
 function generateWaiverKey(jobId, vendorId, month, year) {
-    const baseKey = `${String(jobId).trim()}${String(vendorId).trim()}${String(month).trim()}${String(year).trim()}`;
+    const paddedMonth = String(month).trim().padStart(2, '0');
+    const baseKey = `${String(jobId).trim()}-${String(vendorId).trim()}-${paddedMonth}-${String(year).trim()}`;
     const matchingCount = (window.Workspace.appData.waivers || []).filter(w => String(w["Waiver ID"]).startsWith(baseKey)).length;
     return `${baseKey}-${matchingCount + 1}`;
 }
