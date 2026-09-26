@@ -47,13 +47,7 @@ async function sweepInboxToTriage() {
     let updatesToExcel = [];
     let filesScanned = 0;
 
-    let pdfjsLib;
-    let detector;
-    
-    if ('BarcodeDetector' in window) {
-        pdfjsLib = window['pdfjs-dist/build/pdf'];
-        detector = new BarcodeDetector({ formats: ['qr_code'] });
-    }
+    let pdfjsLib = window['pdfjs-dist/build/pdf'];
 
     for await (const entry of inboxFolder.values()) {
         if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.pdf')) {
@@ -64,7 +58,9 @@ async function sweepInboxToTriage() {
                 const file = await entry.getFile();
                 const arrayBuffer = await file.arrayBuffer();
 
-                if (detector && pdfjsLib) {
+                let qrRawValue = null;
+
+                if (pdfjsLib) {
                     const pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
                     const page = await pdfDoc.getPage(1);
                     const viewport = page.getViewport({ scale: 2.0 }); 
@@ -75,26 +71,33 @@ async function sweepInboxToTriage() {
                     canvas.height = viewport.height; 
                     await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
-                    const barcodes = await detector.detect(canvas);
-                    
-                    if (barcodes.length > 0) {
-                        const parts = barcodes[0].rawValue.split(' ');
-                        
-                        row["Extracted Job ID"] = parts[0];
-                        row["Extracted Vendor ID"] = parts[1].replace(/^0+/, '');
-                        
-                        row["Pay App Month"] = parts[2].substring(0, 2);
-                        row["Pay App Year"] = parts[2].substring(2, 6);
-                        
-                        const wDate = parts[3].replace('|', '');
-                        row["WaiverMonth"] = wDate.substring(0, 2);
-                        row["WaiverYear"] = wDate.substring(2, 6);
-                        
-                        row["Waiver Type"] = parts[4] || "";
-                        row["Status"] = "Pending Review";
-                    } else {
-                        row["Status"] = "Pending Review (Manual)";
+                    // Extract pixel data for jsQR decoding
+                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imgData.data, imgData.width, imgData.height, {
+                        inversionAttempts: "dontInvert",
+                    });
+
+                    if (code) {
+                        qrRawValue = code.data;
                     }
+                }
+
+                if (qrRawValue) {
+                    const parts = qrRawValue.split(' ');
+                    // Example: ["21587", "0000036046", "012027", "|122026", "UNCOND"]
+                    
+                    row["Extracted Job ID"] = parts[0];
+                    row["Extracted Vendor ID"] = parts[1].replace(/^0+/, '');
+                    
+                    row["Pay App Month"] = parts[2].substring(0, 2);
+                    row["Pay App Year"] = parts[2].substring(2, 6);
+                    
+                    const wDate = parts[3].replace('|', '');
+                    row["WaiverMonth"] = wDate.substring(0, 2);
+                    row["WaiverYear"] = wDate.substring(2, 6);
+                    
+                    row["Waiver Type"] = parts[4] || "";
+                    row["Status"] = "Pending Review";
                 } else {
                     row["Status"] = "Pending Review (Manual)";
                 }
@@ -115,7 +118,7 @@ async function sweepInboxToTriage() {
     }
 
     if (updatesToExcel.length > 0) {
-        console.log(`Swept ${filesScanned} files from Inbox to Triage.`);
+        console.log(`Swept ${filesScanned} files from Inbox to Triage and extracted QR data.`);
         const queueFileHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.waiverReviewQueue);
         await UpdateExcel(queueFileHandle, updatesToExcel, "Queue ID", "WaiverReviewQueue");
     }
