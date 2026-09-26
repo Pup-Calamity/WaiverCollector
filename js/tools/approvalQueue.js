@@ -78,26 +78,32 @@ async function sweepInboxToTriage() {
                     });
 
                     if (code) {
-                        // Split by spaces
-                        const parts = code.data.split(' ');
-                        // Example parts: ['21587', '0000036046', '012027', '|122026', 'UNCOND']
-                        
-                        row["Job ID"] = parts[0] || "";
-                        row["Vendor ID"] = parts[1] ? parts[1].replace(/^0+/, '') : "";
-                        
-                        // Pay App Date (MMYYYY)
-                        const payAppRaw = parts[2] || "";
-                        row["Pay App Month"] = payAppRaw.substring(0, 2);
-                        row["Pay App Year"] = payAppRaw.substring(2, 6);
-                        
-                        // Waiver Date (Strip the pipe symbol first)
-                        const wDateRaw = (parts[3] || "").replace('|', ''); // e.g. "122026"
-                        row["Waiver Month"] = wDateRaw.substring(0, 2);
-                        row["Waiver Year"] = wDateRaw.substring(2, 6);
-                        
-                        row["Waiver Type"] = parts[4] || "";
-                        row["Status"] = "Pending Review";
-                    } 
+                        qrRawValue = code.data;
+                    }
+                }
+
+               if (qrRawValue) {
+                    // Example barcode format: "21587 0000036046 012027 |122026 UNCOND"
+                    const parts = qrRawValue.split(' ');
+                    
+                    // Map directly to your exact Excel template columns
+                    row["Job ID"] = parts[0] || "";
+                    row["Vendor ID"] = parts[1] ? parts[1].replace(/^0+/, '') : "";
+                    
+                    const payAppRaw = parts[2] || "";
+                    row["Pay App Month"] = payAppRaw.substring(0, 2);
+                    row["Pay App Year"] = payAppRaw.substring(2, 6);
+                    
+                    const wDateRaw = (parts[3] || "").replace('|', ''); // Strips the pipe symbol
+                    row["Waiver Month"] = wDateRaw.substring(0, 2);
+                    row["Waiver Year"] = wDateRaw.substring(2, 6);
+                    
+                    row["Waiver Type"] = parts[4] || "";
+                    row["Status"] = "Pending Review";
+                } else {
+                    row["Status"] = "Pending Review (Manual)";
+                }
+
                 const newFileHandle = await triageFolder.getFileHandle(entry.name, { create: true });
                 const writable = await newFileHandle.createWritable();
                 await writable.write(arrayBuffer);
