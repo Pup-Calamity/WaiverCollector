@@ -299,6 +299,7 @@
         </div>
     </div>
 
+    <!-- VIEW: Approval Queue Split-Screen -->
     <div id="approvalQueueView" class="view-section hub-section" style="max-width: 100%; padding: 20px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <div>
@@ -329,28 +330,46 @@
                 </div>
                 
                 <div class="card" style="padding: 20px; display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; margin: 0;">
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; flex: 1;">
-                        <div>
-                            <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Job ID</label>
-                            <input type="text" id="aqJobId" style="margin: 0; padding: 10px;" placeholder="e.g. 21587">
+                    <div style="flex: 1;">
+                        <!-- Row 1: Core IDs -->
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+                            <div>
+                                <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Job ID</label>
+                                <input type="text" id="aqJobId" style="margin: 0; padding: 10px;" placeholder="e.g. 21587">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Vendor ID</label>
+                                <input type="text" id="aqVendorId" style="margin: 0; padding: 10px;" placeholder="e.g. 36046">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Waiver Type</label>
+                                <input type="text" id="aqType" style="margin: 0; padding: 10px;" placeholder="e.g. COND">
+                            </div>
                         </div>
-                        <div>
-                            <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Vendor ID</label>
-                            <input type="text" id="aqVendorId" style="margin: 0; padding: 10px;" placeholder="e.g. 36046">
-                        </div>
-                        <div>
-                            <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Month (MM)</label>
-                            <input type="text" id="aqMonth" style="margin: 0; padding: 10px;" placeholder="08">
-                        </div>
-                        <div>
-                            <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Year (YYYY)</label>
-                            <input type="text" id="aqYear" style="margin: 0; padding: 10px;" placeholder="2026">
+                        <!-- Row 2: Date Splitting -->
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+                            <div>
+                                <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Pay App Month</label>
+                                <input type="text" id="aqPayAppMonth" style="margin: 0; padding: 10px;" placeholder="01">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Pay App Year</label>
+                                <input type="text" id="aqPayAppYear" style="margin: 0; padding: 10px;" placeholder="2027">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Waiver Month</label>
+                                <input type="text" id="aqWaiverMonth" style="margin: 0; padding: 10px;" placeholder="12">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8em; font-weight: bold; color: var(--text-muted);">Waiver Year</label>
+                                <input type="text" id="aqWaiverYear" style="margin: 0; padding: 10px;" placeholder="2026">
+                            </div>
                         </div>
                     </div>
                     
-                    <div style="display: flex; gap: 10px;">
-                        <button id="aqRejectBtn" class="primary-btn" style="width: auto; background: #ef4444;" disabled>❌ Reject</button>
-                        <button id="aqApproveBtn" class="primary-btn" style="width: auto; background: #10b981;" disabled>✅ Approve & File</button>
+                    <div style="display: flex; flex-direction: column; gap: 10px; height: 100%; justify-content: flex-end;">
+                        <button id="aqRejectBtn" class="primary-btn" style="width: 150px; background: #ef4444;" disabled>❌ Reject</button>
+                        <button id="aqApproveBtn" class="primary-btn" style="width: 150px; background: #10b981;" disabled>✅ Approve & File</button>
                     </div>
                 </div>
             </div>

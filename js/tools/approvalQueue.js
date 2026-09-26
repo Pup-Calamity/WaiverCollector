@@ -86,17 +86,27 @@ async function sweepInboxToTriage() {
                     
                     if (barcodes.length > 0) {
                         const parts = barcodes[0].rawValue.split(' ');
-                        row["Extracted Job ID"] = parts[0];
-                        row["Extracted Vendor ID"] = parts[1].replace(/^0+/, '');
-                        row["WaiverMonth"] = parts[2].substring(0, 2);
-                        row["WaiverYear"] = "20" + parts[2].substring(2, 4);
+                        // Example: ["21587", "0000036046", "012027", "|122026", "UNCOND"]
+                        
+                        row["Job ID"] = parts[0];
+                        row["Vendor ID"] = parts[1].replace(/^0+/, '');
+                        
+                        // Extract Pay App Date (MMYYYY)
+                        row["Pay App Month"] = parts[2].substring(0, 2);
+                        row["Pay App Year"] = parts[2].substring(2, 6); 
+
+                        // Extract Waiver Date (Strip the pipe symbol first)
+                        const wDate = parts[3].replace('|', ''); // e.g. "122026"
+                        row["Waiver Month"] = wDate.substring(0, 2);
+                        row["Waiver Year"] = wDate.substring(2, 6); 
+
+                        // Extract Type
+                        row["Waiver Type"] = parts[4] || "";
+                        
                         row["Status"] = "Pending Review";
                     } else {
                         row["Status"] = "Pending Review (Manual)";
                     }
-                } else {
-                    row["Status"] = "Pending Review (Manual)";
-                }
 
                 // Move file to Triage
                 const newFileHandle = await triageFolder.getFileHandle(entry.name, { create: true });

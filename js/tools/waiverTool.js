@@ -306,6 +306,19 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
                 
                 const { startDay: prevStartDay, endingDay: prevEndDay } = calculatePeriodDates(targetMonth, targetYear, "trailing", jobSettings["Through Day"] || 31);
                 
+                // --- NEW BARCODE FORMATTING ---
+                let payAppM = String(targetMonth).trim().padStart(2, '0');
+                let payAppY = String(targetYear).trim();
+                let wvrM = String(waiverMonthInt).trim().padStart(2, '0');
+                let wvrY = payAppY;
+
+                if (payAppM === "01" && wvrM === "12") {
+                    wvrY = String(parseInt(payAppY) - 1);
+                }
+
+                const formattedBarcode = `${jobId} ${vendorId.padStart(10, '0')} ${payAppM} ${payAppY} |${wvrM} ${wvrY} ${typeLabel}`;
+                // ------------------------------
+
                 const mappingData = {
                     "amount": finalAmount, "amountWords": WaiverMath.spellNumber(finalAmount),
                     "previousperiod": WaiverMath.getAmount(jobId, vendorId, prevStartDay, prevEndDay, isFinal, "<>V"),
@@ -327,7 +340,7 @@ window.batchProcessWaivers = async function(waiverIds, isFinal = false, isManual
                     "paidThruDate": new Date(startDay.getTime() - 86400000).toLocaleDateString(), 
                     "day": endingDay.getDate().toString(), "month": endingDay.toLocaleString('default', { month: 'long' }), "year": endingDay.getFullYear().toString(),
                     "dueDate": vendorDueDate.toLocaleDateString(), // <--- Uses 48-Hour Urgency Date here
-                    "barcode": `${jobId} ${vendorId.padStart(10, '0')} ${endingDay.toLocaleDateString('en-US', {month: '2-digit', year: '2-digit'}).replace('/', '')} |${endingDay.toLocaleDateString('en-US', {month: '2-digit'})}`
+                    "barcode": formattedBarcode
                 };
 
                 const pdfBuffer = await (await templatesDir.getFileHandle(`${templateName}.pdf`)).getFile().then(f => f.arrayBuffer());
