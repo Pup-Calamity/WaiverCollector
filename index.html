@@ -317,6 +317,7 @@
                 <div>
                     <label style="font-size: 0.7em; font-weight: bold; color: var(--text-muted);">Cond Rule</label>
                     <select id="njCondRule" style="margin: 0; padding: 6px; font-size: 0.8em;">
+                        <option value="">None</option>
                         <option value="trailing">Trailing</option>
                         <option value="current">Current</option>
                     </select>
@@ -324,6 +325,7 @@
                 <div>
                     <label style="font-size: 0.7em; font-weight: bold; color: var(--text-muted);">Uncond Rule</label>
                     <select id="njUncondRule" style="margin: 0; padding: 6px; font-size: 0.8em;">
+                        <option value="">None</option>
                         <option value="trailing">Trailing</option>
                         <option value="current">Current</option>
                     </select>
@@ -358,7 +360,63 @@
             </div>
         </form>
     </dialog>
-    
+
+    <!-- New Vendor Region Modal -->
+    <dialog id="newVendorRegionModal" style="padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--surface-color); width: 500px; box-shadow: var(--card-shadow); color: var(--text-main);">
+        <h3 style="margin-top: 0; margin-bottom: 8px; font-size: 1.1em; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">🏢 Setup New Vendor Region</h3>
+        <p style="font-size: 0.8em; color: var(--text-muted); margin-bottom: 12px;">Fill out regional contact and address details for this vendor.</p>
+        
+        <form id="newVendorRegionForm" onsubmit="event.preventDefault();">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                <div>
+                    <label style="font-size: 0.75em; font-weight: bold; color: var(--text-muted);">Vendor ID *</label>
+                    <input type="text" id="nvrVendorId" readonly style="margin: 0; padding: 6px; font-size: 0.85em; background: var(--bg-color);">
+                </div>
+                <div>
+                    <label style="font-size: 0.75em; font-weight: bold; color: var(--text-muted);">Vendor Region *</label>
+                    <input type="text" id="nvrRegionNum" placeholder="e.g. 2" required style="margin: 0; padding: 6px; font-size: 0.85em;">
+                </div>
+            </div>
+
+            <div style="margin-bottom: 8px;">
+                <label style="font-size: 0.75em; font-weight: bold; color: var(--text-muted);">Region Description</label>
+                <input type="text" id="nvrDesc" placeholder="e.g. Southeast Division" style="margin: 0; padding: 6px; font-size: 0.85em;">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                <div>
+                    <label style="font-size: 0.75em; font-weight: bold; color: var(--text-muted);">Contact Name</label>
+                    <input type="text" id="nvrContact" placeholder="e.g. Jane Doe" style="margin: 0; padding: 6px; font-size: 0.85em;">
+                </div>
+                <div>
+                    <label style="font-size: 0.75em; font-weight: bold; color: var(--text-muted);">Region Email</label>
+                    <input type="email" id="nvrEmail" placeholder="e.g. region2@vendor.com" style="margin: 0; padding: 6px; font-size: 0.85em;">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                <div>
+                    <label style="font-size: 0.75em; font-weight: bold; color: var(--text-muted);">Region Phone</label>
+                    <input type="text" id="nvrPhone" placeholder="e.g. 555-0199" style="margin: 0; padding: 6px; font-size: 0.85em;">
+                </div>
+                <div>
+                    <label style="font-size: 0.75em; font-weight: bold; color: var(--text-muted);">Region Address</label>
+                    <input type="text" id="nvrAddress" placeholder="e.g. 456 Industrial Pkwy" style="margin: 0; padding: 6px; font-size: 0.85em;">
+                </div>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label style="font-size: 0.75em; font-weight: bold; color: var(--text-muted);">Vendor Notes</label>
+                <input type="text" id="nvrNotes" placeholder="Optional regional notes..." style="margin: 0; padding: 6px; font-size: 0.85em;">
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" id="cancelNvrBtn" class="primary-btn" style="width: auto; padding: 6px 10px; background: transparent; color: var(--text-main); border: 1px solid var(--border-color); font-size: 0.85em;">Cancel</button>
+                <button type="submit" id="saveNvrBtn" class="primary-btn" style="width: auto; padding: 6px 12px; background: #6366f1; font-size: 0.85em;">Save Region</button>
+            </div>
+        </form>
+    </dialog>
+
     <!-- Batch Processing Settings Modal -->
     <dialog id="batchSettingsModal" style="padding: 25px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--surface-color); width: 450px; box-shadow: var(--card-shadow);">
         <h3 style="margin-top: 0; color: var(--text-main); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">Batch Processing Settings</h3>

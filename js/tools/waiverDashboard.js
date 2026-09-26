@@ -364,33 +364,54 @@ window.addEventListener('DOMContentLoaded', () => {
         rowDiv.className = 'vendor-row';
         rowDiv.style.cssText = "background: var(--bg-color); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 6px;";
         
+        const vendorInfoData = window.Workspace.appData.vendorInfo || [];
+        const uniqueRegions = [...new Set(vendorInfoData.map(v => String(v["Vendor Region"] || "").trim()))].filter(Boolean);
+        let regionOptions = uniqueRegions.map(r => `<option value="${r}">Region ${r}</option>`).join('');
+        regionOptions += `<option value="NEW">➕ Add New Region...</option>`;
+
         rowDiv.innerHTML = `
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1.2fr 1fr 30px; gap: 6px; align-items: center;">
                 <input type="text" class="v-id" placeholder="Vendor ID *" style="margin:0; padding:6px; font-size:0.85em;" required>
-                <input type="text" class="v-reg" placeholder="Region" value="1" style="margin:0; padding:6px; font-size:0.85em;">
+                
+                <select class="v-reg-select" style="margin:0; padding:6px; font-size:0.85em;">
+                    ${regionOptions}
+                </select>
+
                 <input type="text" class="v-amt" placeholder="Contract Amount" style="margin:0; padding:6px; font-size:0.85em;">
                 <input type="text" class="v-desc" placeholder="Contract Description" style="margin:0; padding:6px; font-size:0.85em;">
                 <input type="date" class="v-date" style="margin:0; padding:5px; font-size:0.85em;" title="Contract Date">
                 <button type="button" class="remove-vendor-btn" style="background: transparent; border: none; color: #ef4444; font-size: 1.2em; cursor: pointer; font-weight: bold;" title="Remove Vendor">×</button>
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr; gap: 6px;">
-                <input type="text" class="v-owner" placeholder="Owner Name" style="margin:0; padding:5px; font-size:0.8em;">
-                <input type="text" class="v-gcname" placeholder="GC Name" style="margin:0; padding:5px; font-size:0.8em;">
-                <input type="text" class="v-gcnum" placeholder="GC Numbers" style="margin:0; padding:5px; font-size:0.8em;">
-                <input type="text" class="v-tier" placeholder="Third Tier (Hiring)" style="margin:0; padding:5px; font-size:0.8em;">
-                <input type="text" class="v-cc" placeholder="Special CCs (;)" style="margin:0; padding:5px; font-size:0.8em;">
-                <select class="v-manual" style="margin:0; padding:5px; font-size:0.8em;">
-                    <option value="">Manual Only: No</option>
-                    <option value="Yes">Manual Only: Yes</option>
-                </select>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;">
-                <input type="text" class="v-cond" placeholder="Conditional Template" value="Standard_Cond" style="margin:0; padding:5px; font-size:0.8em;">
-                <input type="text" class="v-uncond" placeholder="Unconditional Template" value="Standard_Uncond" style="margin:0; padding:5px; font-size:0.8em;">
-                <input type="text" class="v-final" placeholder="Final Template" value="Standard_Final" style="margin:0; padding:5px; font-size:0.8em;">
-            </div>
-            <input type="text" class="v-note" placeholder="Special Email Note (optional)..." style="margin:0; padding:5px; font-size:0.8em; width:100%;">
+            <!-- metadata inputs... (owner, gc name, etc.) -->
         `;
+
+        const regSelect = rowDiv.querySelector('.v-reg-select');
+        const vIdInput = rowDiv.querySelector('.v-id');
+
+        regSelect.addEventListener('change', () => {
+            if (regSelect.value === "NEW") {
+                const currentVId = vIdInput.value.trim();
+                if (!currentVId) {
+                    alert("Please enter the Vendor ID first before creating a new region.");
+                    regSelect.value = uniqueRegions[0] || "1";
+                    return;
+                }
+
+                // Open the New Region Dialog
+                document.getElementById('nvrVendorId').value = currentVId;
+                document.getElementById('nvrRegionNum').value = "";
+                document.getElementById('nvrDesc').value = "";
+                document.getElementById('nvrContact').value = "";
+                document.getElementById('nvrEmail').value = "";
+                document.getElementById('nvrPhone').value = "";
+                document.getElementById('nvrAddress').value = "";
+                document.getElementById('nvrNotes').value = "";
+                
+                // Store active reference element so we can update it when saved
+                window._activeRegionSelect = regSelect;
+                document.getElementById('newVendorRegionModal').showModal();
+            }
+        });
 
         rowDiv.querySelector('.remove-vendor-btn').addEventListener('click', () => {
             if (vendorContainer.children.length > 1) {
@@ -489,15 +510,40 @@ window.addEventListener('DOMContentLoaded', () => {
 
             const vendorRows = document.querySelectorAll('.vendor-row');
             let newContracts = [];
+            let newVendorInfos = [];
 
             for (const row of vendorRows) {
                 const vId = row.querySelector('.v-id').value.trim();
                 if (!vId) continue;
 
+                // Determine Region value (Select or Custom New Input)
+                const regSelectVal = row.querySelector('.v-reg-select').value;
+                const regNewVal = row.querySelector('.v-reg-new').value.trim();
+                const vendorRegion = regSelectVal === "NEW" ? regNewVal : regSelectVal;
+
+                if (regSelectVal === "NEW" && !vendorRegion) {
+                    return alert(`Please enter a region number for Vendor ID ${vId}.`);
+                }
+
+                // If it's a brand new region for this vendor, create a vendorInfo record
+                if (regSelectVal === "NEW") {
+                    newVendorInfos.push({
+                        "Key": `${vId}-${vendorRegion}`,
+                        "Vendor ID": vId,
+                        "Vendor Region": vendorRegion,
+                        "Region Description": "",
+                        "Region Contact Name": "",
+                        "Region Email": "",
+                        "Region Address": "",
+                        "Region Phone": "",
+                        "Vendor Notes": ""
+                    });
+                }
+
                 newContracts.push({
                     "Key": `${jobId}-${vId}`,
                     "Vendor ID": vId,
-                    "Vendor Region": row.querySelector('.v-reg').value.trim() || "1",
+                    "Vendor Region": vendorRegion,
                     "Vendor Name": "",
                     "Job ID": jobId,
                     "Job Name": jobName,
@@ -563,6 +609,17 @@ window.addEventListener('DOMContentLoaded', () => {
                     await UpdateExcel(contractHandle, newContracts, "Key", "Contract Info");
                 }
 
+                // 4. Save New Vendor Regions to Vendor Info Excel (if any created)
+                if (newVendorInfos.length > 0) {
+                    if (!window.Workspace.appData.vendorInfo) window.Workspace.appData.vendorInfo = [];
+                    window.Workspace.appData.vendorInfo.push(...newVendorInfos);
+                    
+                    const vendorInfoHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.vendorInfo);
+                    if (vendorInfoHandle) {
+                        await UpdateExcel(vendorInfoHandle, newVendorInfos, "Key", "Vendor Info");
+                    }
+                }
+
                 jobModal.close();
                 alert(`Successfully initialized Job ${jobId} rules, address fields, and ${newContracts.length} vendor contract(s)!`);
 
@@ -572,6 +629,63 @@ window.addEventListener('DOMContentLoaded', () => {
             } finally {
                 saveBtn.textContent = "Save Job & Contracts";
                 saveBtn.disabled = false;
+            }
+        });
+    }
+
+    // --- New Vendor Region Modal Engine ---
+    const nvrModal = document.getElementById('newVendorRegionModal');
+    const nvrForm = document.getElementById('newVendorRegionForm');
+    const cancelNvrBtn = document.getElementById('cancelNvrBtn');
+
+    if (cancelNvrBtn) cancelNvrBtn.addEventListener('click', () => nvrModal.close());
+
+    if (nvrForm) {
+        nvrForm.addEventListener('submit', async () => {
+            const vId = document.getElementById('nvrVendorId').value.trim();
+            const regNum = document.getElementById('nvrRegionNum').value.trim();
+            
+            if (!regNum) return alert("Region number is required.");
+
+            const newVendorInfoRow = {
+                "Key": `${vId}-${regNum}`,
+                "Vendor ID": vId,
+                "Vendor Region": regNum,
+                "Region Description": document.getElementById('nvrDesc').value.trim(),
+                "Region Contact Name": document.getElementById('nvrContact').value.trim(),
+                "Region Email": document.getElementById('nvrEmail').value.trim(),
+                "Region Address": document.getElementById('nvrAddress').value.trim(),
+                "Region Phone": document.getElementById('nvrPhone').value.trim(),
+                "Vendor Notes": document.getElementById('nvrNotes').value.trim()
+            };
+
+            try {
+                // 1. Push to memory appData
+                if (!window.Workspace.appData.vendorInfo) window.Workspace.appData.vendorInfo = [];
+                window.Workspace.appData.vendorInfo.push(newVendorInfoRow);
+
+                // 2. Save to Vendor Info Excel file
+                const vendorInfoHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.vendorInfo);
+                if (vendorInfoHandle) {
+                    await UpdateExcel(vendorInfoHandle, [newVendorInfoRow], "Key", "Vendor Info");
+                }
+
+                // 3. Dynamically update the active select dropdown and select the new region
+                if (window._activeRegionSelect) {
+                    const newOpt = document.createElement('option');
+                    newOpt.value = regNum;
+                    newOpt.textContent = `Region ${regNum}`;
+                    // Insert before the "NEW" option
+                    window._activeRegionSelect.insertBefore(newOpt, window._activeRegionSelect.lastElementChild);
+                    window._activeRegionSelect.value = regNum;
+                }
+
+                nvrModal.close();
+                alert(`Successfully created Region ${regNum} for Vendor ${vId} and updated Vendor Info!`);
+
+            } catch (err) {
+                console.error("Failed to save vendor region:", err);
+                alert("Error saving region configuration. Check console.");
             }
         });
     }
