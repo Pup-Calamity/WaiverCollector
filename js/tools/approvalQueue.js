@@ -78,30 +78,26 @@ async function sweepInboxToTriage() {
                     });
 
                     if (code) {
-                        qrRawValue = code.data;
-                    }
-                }
-
-                if (qrRawValue) {
-                    const parts = qrRawValue.split(' ');
-                    // Example: ["21587", "0000036046", "012027", "|122026", "UNCOND"]
-                    
-                        row["Job ID"] = parts[0];
-                        row["Vendor ID"] = parts[1].replace(/^0+/, '');
+                        // Split by spaces
+                        const parts = code.data.split(' ');
+                        // Example parts: ['21587', '0000036046', '012027', '|122026', 'UNCOND']
                         
-                        row["Pay App Month"] = parts[2].substring(0, 2);
-                        row["Pay App Year"] = parts[2].substring(2, 6);
+                        row["Job ID"] = parts[0] || "";
+                        row["Vendor ID"] = parts[1] ? parts[1].replace(/^0+/, '') : "";
                         
-                        const wDate = parts[3].replace('|', '');
-                        row["Waiver Month"] = wDate.substring(0, 2);
-                        row["Waiver Year"] = wDate.substring(2, 6);
+                        // Pay App Date (MMYYYY)
+                        const payAppRaw = parts[2] || "";
+                        row["Pay App Month"] = payAppRaw.substring(0, 2);
+                        row["Pay App Year"] = payAppRaw.substring(2, 6);
+                        
+                        // Waiver Date (Strip the pipe symbol first)
+                        const wDateRaw = (parts[3] || "").replace('|', ''); // e.g. "122026"
+                        row["Waiver Month"] = wDateRaw.substring(0, 2);
+                        row["Waiver Year"] = wDateRaw.substring(2, 6);
                         
                         row["Waiver Type"] = parts[4] || "";
                         row["Status"] = "Pending Review";
-                    } else {
-                        row["Status"] = "Pending Review (Manual)";
-                    }
-
+                    } 
                 const newFileHandle = await triageFolder.getFileHandle(entry.name, { create: true });
                 const writable = await newFileHandle.createWritable();
                 await writable.write(arrayBuffer);
