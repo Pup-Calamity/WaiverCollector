@@ -217,131 +217,6 @@ window.populateYearFilter = function() {
     });
 }
 
-// --- Master Table Renderer ---
-window.renderWaiverTable = function() {
-    const waivers = window.Workspace.appData.waivers || [];
-    const tbody = document.getElementById('waiverTableBody');
-    if (!tbody) return;
-
-    // Reset Select All checkbox when table updates
-    const selectAllCb = document.getElementById('selectAllWaivers');
-    if (selectAllCb) selectAllCb.checked = false;
-
-    // Safely get filter values
-    const searchVal = document.getElementById('dashboardSearch') ? document.getElementById('dashboardSearch').value.toLowerCase() : "";
-    const statusVal = document.getElementById('dashboardStatus') ? document.getElementById('dashboardStatus').value.toLowerCase() : ""; 
-    const monthVal = document.getElementById('dashboardMonth') ? document.getElementById('dashboardMonth').value : "";
-    const yearVal = document.getElementById('dashboardYear') ? document.getElementById('dashboardYear').value : "";
-
-    tbody.innerHTML = "";
-
-    const sortedWaivers = [...waivers].reverse(); 
-    let matchCount = 0;
-
-    for (const row of sortedWaivers) {
-        const jobId = String(row["Job ID"] || "").trim();
-        const vendorId = String(row["Vendor ID"] || "").trim();
-        const customerId = String(row["Customer ID"] || "").trim();
-        const rowStatusRaw = String(row["Status"] || "").trim();
-        
-        let jobName = "Unknown Job";
-        let vendorName = "Unknown Vendor";
-
-        try {
-            if (typeof WaiverMath !== 'undefined') {
-                jobName = WaiverMath.getEmailInfo(jobId, vendorId, "Job Name") || "Unknown Job";
-                vendorName = WaiverMath.getEmailInfo(jobId, vendorId, "Vendor Name") || "Unknown Vendor";
-            }
-        } catch (error) {}
-
-        // 1. FILTER: Status
-        if (statusVal) {
-            const checkStatus = rowStatusRaw.toLowerCase();
-            if (statusVal === "held") {
-                if (!checkStatus.includes("held")) continue; 
-            } else if (statusVal === "received") {
-                if (checkStatus !== "received" && checkStatus !== "paid") continue;
-            } else {
-                if (checkStatus !== statusVal) continue;
-            }
-        }
-
-        // 2. FILTER: Month & Year
-        if (monthVal && parseInt(row["Month"]) !== parseInt(monthVal)) continue;
-        if (yearVal && String(row["Year"]).trim() !== yearVal) continue;
-
-        // 3. FILTER: Search Bar 
-        const searchString = `${jobId} ${jobName} ${vendorId} ${vendorName} ${customerId}`.toLowerCase();
-        if (searchVal && !searchString.includes(searchVal)) continue;
-
-        matchCount++;
-        if (matchCount > 200) break; 
-
-        // 4. Format Status Color Bubble
-        let statusStyle = "background: #e2e8f0; color: #475569;"; 
-        if (rowStatusRaw.toLowerCase() === "ready") statusStyle = "background: #dbeafe; color: #1d4ed8;";
-        if (rowStatusRaw.toLowerCase() === "sent") statusStyle = "background: #fef9c3; color: #854d0e;";
-        if (rowStatusRaw.toLowerCase() === "received" || rowStatusRaw.toLowerCase() === "paid") statusStyle = "background: #dcfce7; color: #15803d;";
-        if (rowStatusRaw.toLowerCase().includes("held")) statusStyle = "background: #fee2e2; color: #b91c1c;";
-
-        // 5. Convert Month Number to Name
-        const monthNum = parseInt(row["Month"]);
-        const displayMonth = !isNaN(monthNum) && monthNum >= 1 && monthNum <= 12 ? monthNames[monthNum] : row["Month"];
-
-        const tr = document.createElement('tr');
-        tr.style.borderBottom = "1px solid var(--border-color)";
-        
-        // ---> NOTICE THE FIX ON THE CHECKBOX INPUT HERE <---
-        tr.innerHTML = `
-            <td style="padding: 12px; text-align: center;">
-                <input type="checkbox" class="row-checkbox" style="transform: scale(1.2); cursor: pointer;" 
-                       data-waiver-id="${row["Waiver ID"]}">
-            </td>
-            <td style="padding: 12px;"><strong>${row["Waiver ID"] || ""}</strong></td>
-            <td style="padding: 12px;">
-                <div style="font-weight: bold;">${jobId}</div>
-                <div style="font-size: 0.85em; color: var(--text-muted);">${jobName}</div>
-            </td>
-            <td style="padding: 12px;">
-                <div style="font-weight: bold;">${vendorId}</div>
-                <div style="font-size: 0.85em; color: var(--text-muted);">${vendorName}</div>
-            </td>
-            <td style="padding: 12px;">${displayMonth}</td>
-            <td style="padding: 12px;">
-                <span style="padding: 4px 8px; border-radius: 12px; font-size: 0.85em; font-weight: bold; ${statusStyle}">${rowStatusRaw}</span>
-            </td>
-            <td style="padding: 12px;">${row["Sent Date"] || "-"}</td>
-            <td style="padding: 12px;">${row["Received Date"] || "-"}</td>
-            <td style="padding: 12px;">${row["Action Date"] || "-"}</td>
-            <td style="padding: 12px; text-align: center;">
-                <button class="icon-btn read-notes-btn" style="background: transparent; font-size: 1.2em; border: none; cursor: pointer;">📝</button>
-            </td>
-        `;
-
-        const notesBtn = tr.querySelector('.read-notes-btn');
-        if (notesBtn) {
-            const rawNotes = row["Notes"] || "No notes available.";
-            notesBtn.addEventListener('click', () => {
-                // Populate existing notes
-                document.getElementById('notesModalContent').textContent = rawNotes;
-                // Clear the new note input box
-                document.getElementById('newNoteInput').value = "";
-                // Attach the Waiver ID to the modal itself so the Save button can find it!
-                document.getElementById('readNotesModal').dataset.waiverId = row["Waiver ID"];
-                
-                document.getElementById('readNotesModal').showModal();
-            });
-        }
-
-        tbody.appendChild(tr);
-    }
-
-    if (matchCount === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" style="padding: 20px; text-align: center; color: var(--text-muted);">No waivers found matching these filters.</td></tr>`;
-    }
-};
-
-
 // --- Dynamic Year Dropdown ---
 window.populateYearFilter = function() {
     const waivers = window.Workspace.appData.waivers || [];
@@ -437,28 +312,28 @@ window.renderWaiverTable = function() {
         tr.style.borderBottom = "1px solid var(--border-color)";
         
         tr.innerHTML = `
-            <td style="padding: 12px; text-align: center;">
-                <input type="checkbox" class="row-checkbox" style="transform: scale(1.2); cursor: pointer;" 
+            <td style="padding: 6px 10px; text-align: center;">
+                <input type="checkbox" class="row-checkbox" style="transform: scale(1.0); cursor: pointer;" 
                        data-waiver-id="${row["Waiver ID"]}">
             </td>
-            <td style="padding: 12px;"><strong>${row["Waiver ID"] || ""}</strong></td>
-            <td style="padding: 12px;">
-                <div style="font-weight: bold;">${jobId}</div>
-                <div style="font-size: 0.85em; color: var(--text-muted);">${jobName}</div>
+            <td style="padding: 6px 10px; font-family: monospace; font-size: 0.9em;"><strong>${row["Waiver ID"] || ""}</strong></td>
+            <td style="padding: 6px 10px;">
+                <div style="font-weight: bold; line-height: 1.1;">${jobId}</div>
+                <div style="font-size: 0.75em; color: var(--text-muted);">${jobName}</div>
             </td>
-            <td style="padding: 12px;">
-                <div style="font-weight: bold;">${vendorId}</div>
-                <div style="font-size: 0.85em; color: var(--text-muted);">${vendorName}</div>
+            <td style="padding: 6px 10px;">
+                <div style="font-weight: bold; line-height: 1.1;">${vendorId}</div>
+                <div style="font-size: 0.75em; color: var(--text-muted);">${vendorName}</div>
             </td>
-            <td style="padding: 12px;">${displayMonth}</td>
-            <td style="padding: 12px;">
-                <span style="padding: 4px 8px; border-radius: 12px; font-size: 0.85em; font-weight: bold; ${statusStyle}">${rowStatusRaw}</span>
+            <td style="padding: 6px 10px;">${displayMonth}</td>
+            <td style="padding: 6px 10px;">
+                <span style="padding: 2px 6px; border-radius: 8px; font-size: 0.75em; font-weight: bold; ${statusStyle}">${rowStatusRaw}</span>
             </td>
-            <td style="padding: 12px;">${row["Sent Date"] || "-"}</td>
-            <td style="padding: 12px;">${row["Received Date"] || "-"}</td>
-            <td style="padding: 12px;">${row["Action Date"] || "-"}</td>
-            <td style="padding: 12px; text-align: center;">
-                <button class="icon-btn read-notes-btn" style="background: transparent; font-size: 1.2em; border: none; cursor: pointer;">📝</button>
+            <td style="padding: 6px 10px; font-size: 0.85em;">${row["Sent Date"] || "-"}</td>
+            <td style="padding: 6px 10px; font-size: 0.85em;">${row["Received Date"] || "-"}</td>
+            <td style="padding: 6px 10px; font-size: 0.85em;">${row["Action Date"] || "-"}</td>
+            <td style="padding: 6px 10px; text-align: center;">
+                <button class="read-notes-btn" title="View Notes" style="background: transparent; font-size: 1em; border: none; cursor: pointer; padding: 2px 4px;">📝</button>
             </td>
         `;
 

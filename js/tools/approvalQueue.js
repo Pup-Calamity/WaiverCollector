@@ -166,21 +166,21 @@ function renderQueueList() {
         const isSelected = activeQueueItem && activeQueueItem["Queue ID"] === item["Queue ID"];
         
         card.style.cssText = `
-            padding: 15px; 
+            padding: 8px 12px; 
             background: ${isSelected ? 'var(--bg-color)' : 'var(--surface-color)'}; 
-            border: 2px solid ${isSelected ? 'var(--brand-color)' : 'var(--border-color)'}; 
-            border-radius: 8px; 
+            border: 1px solid ${isSelected ? 'var(--brand-color)' : 'var(--border-color)'}; 
+            border-radius: 6px; 
             cursor: pointer;
             transition: all 0.2s;
         `;
         
         card.innerHTML = `
-            <div style="font-weight: bold; color: var(--text-main); margin-bottom: 5px;">${item["File Name"] || "Unknown Document"}</div>
-            <div style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 3px;">Sender: ${item["Sender Email"] || "-"}</div>
-            <div style="font-size: 0.85em; color: var(--text-muted);">
-                <span style="background: #e2e8f0; color: #334155; padding: 2px 6px; border-radius: 4px; font-family: monospace;">J: ${item["Job ID"] || "-"}</span>
-                <span style="background: #e2e8f0; color: #334155; padding: 2px 6px; border-radius: 4px; font-family: monospace;">V: ${item["Vendor ID"] || "-"}</span>
-                <span style="background: #fef08a; color: #854d0e; padding: 2px 6px; border-radius: 4px; font-family: monospace; margin-left: 5px;">${item["Waiver Type"] || "Type"}</span>
+            <div style="font-weight: bold; font-size: 0.9em; color: var(--text-main); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item["File Name"] || "Unknown Document"}</div>
+            <div style="font-size: 0.75em; color: var(--text-muted); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Sender: ${item["Sender Email"] || "-"}</div>
+            <div style="font-size: 0.8em; color: var(--text-muted); display: flex; gap: 4px;">
+                <span style="background: #e2e8f0; color: #334155; padding: 1px 4px; border-radius: 3px; font-family: monospace;">J: ${item["Job ID"] || "-"}</span>
+                <span style="background: #e2e8f0; color: #334155; padding: 1px 4px; border-radius: 3px; font-family: monospace;">V: ${item["Vendor ID"] || "-"}</span>
+                <span style="background: #fef08a; color: #854d0e; padding: 1px 4px; border-radius: 3px; font-family: monospace;">${item["Waiver Type"] || "Type"}</span>
             </div>
         `;
 
@@ -503,13 +503,14 @@ function performLookupSearch() {
         // Search logic: matches if input is empty, or if text exists in ID or Name
         if (!searchTerm || idVal.includes(searchTerm) || nameVal.includes(searchTerm)) {
             const div = document.createElement('div');
-            div.style.cssText = `padding: 10px 15px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;`;
+            div.style.cssText = `padding: 6px 10px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;`;
             div.onmouseover = () => div.style.background = 'var(--surface-color)';
             div.onmouseout = () => div.style.background = 'transparent';
             
+            // Compacted HTML layout
             div.innerHTML = `
-                <div style="font-weight: bold; color: var(--text-main);">${row[idKey] || 'N/A'}</div>
-                <div style="font-size: 0.85em; color: var(--text-muted);">${row[nameKey] || 'Unknown Name'}</div>
+                <div style="font-weight: bold; font-size: 0.9em; color: var(--text-main);">${row[idKey] || 'N/A'}</div>
+                <div style="font-size: 0.75em; color: var(--text-muted);">${row[nameKey] || 'Unknown Name'}</div>
             `;
             
             // When clicked, auto-fill the target box and trigger the UI context update
@@ -535,6 +536,6 @@ function performLookupSearch() {
     }
 
     if (matchCount === 0) {
-        resultsContainer.innerHTML = `<div style="padding: 15px; text-align: center; color: var(--text-muted);">No results found.</div>`;
+        resultsContainer.innerHTML = `<div style="padding: 10px; text-align: center; color: var(--text-muted); font-size: 0.85em;">No results found.</div>`;
     }
 }
