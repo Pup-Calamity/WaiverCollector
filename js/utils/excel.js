@@ -135,34 +135,86 @@ async function UpdateExcel(fileHandle, changedRows, uniqueIdKey, sheetName = "Sh
     }
 }
 
-async function writeDataToExcel(fileHandle, jsonData, sheetName = "Sheet1") {
+// Prepare Excel Data for Upload (ExcelJS Surgical Update)
+async function UpdateExcel(fileHandle, changedRows, uniqueIdKey, sheetName = "Sheet1") {
     try {
-        // 1. Read the existing workbook to preserve structure
+        console.log("Surgically updating Excel cells to preserve Tables...");
+
+        // 1. Unzip the file into memory
         const file = await fileHandle.getFile();
         const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'array' });
-        
-        let targetSheetName = sheetName;
-        if (!workbook.Sheets[targetSheetName]) {
-            targetSheetName = workbook.SheetNames[0] || "Sheet1";
+
+        // 2. Load workbook using ExcelJS (Preserves Tables, Formatting, and Column order)
+        const workbook = new window.ExcelJS.Workbook();
+        await workbook.xlsx.load(buffer);
+
+        // 3. Find the sheet
+        let worksheet = workbook.getWorksheet(sheetName);
+        if (!worksheet) worksheet = workbook.worksheets[0]; // Fallback to first sheet
+
+        // 4. Map the headers to their exact column numbers so nothing gets shuffled
+        const headerRow = worksheet.getRow(1);
+        const headers = {};
+        headerRow.eachCell((cell, colNumber) => {
+            headers[cell.value] = colNumber;
+        });
+
+        if (!headers[uniqueIdKey]) {
+            throw new Error(`Unique ID column "${uniqueIdKey}" not found in sheet.`);
         }
-        
-        // 2. Generate a clean worksheet from the updated JSON data
-        const newWorksheet = XLSX.utils.json_to_sheet(jsonData);
-        
-        // 3. Replace the sheet in the workbook cleanly
-        workbook.Sheets[targetSheetName] = newWorksheet;
-        
-        // 4. Write back to disk
-        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-        
+
+        // --- Audit Trail Setup ---
+        const activeUser = window.Workspace.currentUser || "Unknown User";
+        const now = new Date();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const yyyy = now.getFullYear();
+        const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const timestampString = `${mm}/${dd}/${yyyy} ${timeString}`;
+
+        // 5. Process changes row by row
+        changedRows.forEach(changedRow => {
+            changedRow["Last Updated"] = timestampString;
+            changedRow["Updated By"] = activeUser;
+
+            const targetId = changedRow[uniqueIdKey];
+            let rowIndexToUpdate = -1;
+
+            // Scan the ID column to find which row to update
+            const idCol = headers[uniqueIdKey];
+            worksheet.getColumn(idCol).eachCell((cell, rowNum) => {
+                if (rowNum > 1 && String(cell.value) === String(targetId)) {
+                    rowIndexToUpdate = rowNum;
+                }
+            });
+
+            if (rowIndexToUpdate !== -1) {
+                const excelRow = worksheet.getRow(rowIndexToUpdate);
+                // Only update specific cells where the header matches
+                for (const [key, val] of Object.entries(changedRow)) {
+                    if (headers[key]) {
+                        excelRow.getCell(headers[key]).value = val;
+                    }
+                }
+                excelRow.commit();
+            } else {
+                // Append new row mapping exactly to existing columns
+                const newRowObj = [];
+                for (const [key, colNum] of Object.entries(headers)) {
+                    newRowObj[colNum] = changedRow[key] || "";
+                }
+                worksheet.addRow(newRowObj);
+            }
+        });
+
+        // 6. Re-zip and write the file back out natively
+        const outBuffer = await workbook.xlsx.writeBuffer();
         const writableStream = await fileHandle.createWritable();
-        await writableStream.write(excelBuffer);
+        await writableStream.write(outBuffer);
         await writableStream.close();
-        
-        return true;
+
+        console.log("✅ Cells updated successfully. Table & column structure fully preserved!");
     } catch (error) {
-        console.error(`Failed to write to ${fileHandle.name}:`, error);
-        throw error;
+        console.error("Failed to update Excel:", error);
     }
 }
