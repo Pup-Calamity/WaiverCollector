@@ -178,6 +178,7 @@
                 </select>
             </div>
 
+            <button id="openSetupMonthBtn" class="primary-btn" style="background: #3b82f6; width: auto; padding: 10px 20px;">📅 Setup New Month</button>
             <button id="openBatchGeneratorBtn" class="primary-btn" style="background: #10b981; width: auto; padding: 10px 20px;">🚀 Run Batch Generator</button>
             <button id="returnWaiversBtn" class="secondary-btn" style="padding: 8px 16px;">📥 Mark as Received (Return)</button>
         </div>
@@ -224,6 +225,44 @@
         <div style="display: flex; justify-content: flex-end; gap: 10px;">
             <button id="closeNotesModalBtn" class="secondary-btn" style="width: auto; padding: 6px 12px;">Cancel</button>
             <button id="saveNoteBtn" class="primary-btn" style="width: auto; padding: 6px 16px; background: #3b82f6;">Save Note</button>
+        </div>
+    </dialog>
+    
+    <!-- Monthly Rollover / Job Setup Modal -->
+    <dialog id="setupMonthModal" style="padding: 25px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--surface-color); width: 500px; box-shadow: var(--card-shadow); color: var(--text-main);">
+        <h3 style="margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">📅 Setup New Month (Rollover)</h3>
+        <p style="font-size: 0.9em; color: var(--text-muted); margin-bottom: 20px;">Enter a Job ID to scan for last month's active vendors and roll them forward. Vendors marked "Final" will be automatically excluded.</p>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div style="grid-column: span 3;">
+                <label style="font-size: 0.85em; font-weight: bold; color: var(--text-muted);">Job ID</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="setupJobId" placeholder="e.g. 21587" style="margin: 0; padding: 10px; flex: 1;">
+                    <button id="setupScanBtn" class="primary-btn" style="width: auto; padding: 10px 15px;">Scan</button>
+                </div>
+            </div>
+            <div>
+                <label style="font-size: 0.85em; font-weight: bold; color: var(--brand-color);">Target Month</label>
+                <select id="setupMonth" style="margin: 0; padding: 10px;">
+                    <option value="1">1 - Jan</option><option value="2">2 - Feb</option><option value="3">3 - Mar</option>
+                    <option value="4">4 - Apr</option><option value="5">5 - May</option><option value="6">6 - Jun</option>
+                    <option value="7">7 - Jul</option><option value="8">8 - Aug</option><option value="9">9 - Sep</option>
+                    <option value="10">10 - Oct</option><option value="11">11 - Nov</option><option value="12">12 - Dec</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size: 0.85em; font-weight: bold; color: var(--brand-color);">Target Year</label>
+                <input type="number" id="setupYear" value="2026" style="margin: 0; padding: 10px;">
+            </div>
+        </div>
+
+        <div id="setupVendorChecklist" style="max-height: 250px; overflow-y: auto; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-bottom: 20px; display: none;">
+            <!-- Dynamic checklist injects here -->
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button id="cancelSetupBtn" class="primary-btn" style="width: auto; background: transparent; color: var(--text-main); border: 1px solid var(--border-color);">Cancel</button>
+            <button id="confirmSetupBtn" class="primary-btn" style="width: auto; background: #10b981;" disabled>Create Waiver Records</button>
         </div>
     </dialog>
 

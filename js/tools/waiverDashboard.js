@@ -485,4 +485,162 @@ window.renderWaiverTable = function() {
     }
 };
 
+// ==========================================
+// MONTHLY ROLLOVER / JOB SETUP ENGINE
+// ==========================================
 
+window.addEventListener('DOMContentLoaded', () => {
+    const setupModal = document.getElementById('setupMonthModal');
+    const openSetupBtn = document.getElementById('openSetupMonthBtn');
+    const cancelSetupBtn = document.getElementById('cancelSetupBtn');
+    const scanBtn = document.getElementById('setupScanBtn');
+    const confirmSetupBtn = document.getElementById('confirmSetupBtn');
+
+    if (openSetupBtn) {
+        openSetupBtn.addEventListener('click', () => {
+            const today = new Date();
+            document.getElementById('setupMonth').value = today.getMonth() + 1;
+            document.getElementById('setupYear').value = today.getFullYear();
+            document.getElementById('setupJobId').value = "";
+            document.getElementById('setupVendorChecklist').style.display = "none";
+            document.getElementById('setupVendorChecklist').innerHTML = "";
+            confirmSetupBtn.disabled = true;
+            setupModal.showModal();
+        });
+    }
+
+    if (cancelSetupBtn) cancelSetupBtn.addEventListener('click', () => setupModal.close());
+
+    // --- The Scanner & "Final Collected" Contract Check ---
+    if (scanBtn) {
+        scanBtn.addEventListener('click', () => {
+            const jobId = document.getElementById('setupJobId').value.trim().toLowerCase();
+            if (!jobId) return alert("Please enter a Job ID.");
+
+            const waivers = window.Workspace.appData.waivers || [];
+            const contractInfoData = window.Workspace.appData.contractInfo || [];
+            const checklistContainer = document.getElementById('setupVendorChecklist');
+            checklistContainer.innerHTML = "";
+            checklistContainer.style.display = "block";
+
+            // 1. Get all past waiver records for this specific job
+            const pastJobWaivers = waivers.filter(w => String(w["Job ID"]).trim().toLowerCase() === jobId);
+            
+            if (pastJobWaivers.length === 0) {
+                checklistContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 10px;">No previous vendors found for this Job ID. They will need to be added manually.</div>`;
+                confirmSetupBtn.disabled = true;
+                return;
+            }
+
+            // 2. Identify unique vendors and check Contract Info for "Final Collected"
+            const vendorMap = new Map();
+            
+            pastJobWaivers.forEach(w => {
+                const vendorId = String(w["Vendor ID"]).trim();
+                
+                // Look up this specific vendor's contract row for this job
+                const contractRow = contractInfoData.find(c => 
+                    String(c["Job ID"] || "").trim().toLowerCase() === jobId && 
+                    String(c["Vendor ID"] || "").trim().toLowerCase() === vendorId.toLowerCase()
+                );
+
+                const finalCollectedVal = contractRow ? String(contractRow["Final Collected"] || "").trim().toLowerCase() : "";
+                const isFinal = (finalCollectedVal === "yes");
+
+                // Keep track of the vendor; if they are final anywhere, lock them out
+                if (!vendorMap.has(vendorId) || isFinal) {
+                    vendorMap.set(vendorId, { isFinal: isFinal });
+                }
+            });
+
+            // 3. Render the checklist
+            let validCount = 0;
+            vendorMap.forEach((data, vendorId) => {
+                let vendorName = vendorId;
+                try { vendorName = window.WaiverMath.getEmailInfo(jobId, vendorId, "Vendor Name") || vendorId; } catch(e) {}
+
+                const div = document.createElement('div');
+                div.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid var(--border-color);";
+                
+                if (data.isFinal) {
+                    div.innerHTML = `
+                        <label style="display: flex; align-items: center; gap: 10px; color: var(--text-muted); text-decoration: line-through;">
+                            <input type="checkbox" class="rollover-cb" value="${vendorId}" disabled> 
+                            ${vendorId} - ${vendorName}
+                        </label>
+                        <span style="font-size: 0.8em; color: #b91c1c; font-weight: bold; background: #fee2e2; padding: 2px 6px; border-radius: 4px;">Final Collected</span>
+                    `;
+                } else {
+                    validCount++;
+                    div.innerHTML = `
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: bold; color: var(--text-main);">
+                            <input type="checkbox" class="rollover-cb" value="${vendorId}" checked style="transform: scale(1.2);"> 
+                            ${vendorId} - ${vendorName}
+                        </label>
+                    `;
+                }
+                checklistContainer.appendChild(div);
+            });
+
+            if (validCount > 0) {
+                confirmSetupBtn.disabled = false;
+            } else {
+                checklistContainer.innerHTML += `<div style="text-align: center; color: #b91c1c; padding: 10px; font-weight: bold;">All historical vendors on this job have a "Yes" for Final Collected.</div>`;
+            }
+        });
+    }
+    
+    // --- The Generator & Excel Saver ---
+    if (confirmSetupBtn) {
+        confirmSetupBtn.addEventListener('click', async () => {
+            const jobId = document.getElementById('setupJobId').value.trim();
+            const targetMonth = document.getElementById('setupMonth').value;
+            const targetYear = document.getElementById('setupYear').value;
+            const checkedVendors = Array.from(document.querySelectorAll('.rollover-cb:checked')).map(cb => cb.value);
+
+            if (checkedVendors.length === 0) return alert("No vendors selected to roll over.");
+
+            confirmSetupBtn.textContent = "Saving...";
+            confirmSetupBtn.disabled = true;
+
+            try {
+                let newRecords = [];
+                const jobSettings = window.Workspace.appData.jobNotes?.find(j => String(j["Job ID"]).trim().toLowerCase() === jobId.toLowerCase()) || {};
+
+                // Generate a fresh record for every selected vendor using your math engine
+                for (const vendorId of checkedVendors) {
+                    const { startDay, endingDay, waiverMonthInt } = calculatePeriodDates(targetMonth, targetYear, "trailing", jobSettings["Through Day"] || 31);
+                    const defaultThrough = `${startDay.toLocaleDateString()} to ${endingDay.toLocaleDateString()}`;
+                    
+                    const dueDay = parseInt(jobSettings["Due Day"]) || 25;
+                    const defaultDue = new Date(targetYear, parseInt(targetMonth), dueDay).toLocaleDateString();
+
+                    // Uses prepareNewWaiver from waiverTool.js
+                    const newRow = prepareNewWaiver(jobId, vendorId, targetMonth, targetYear, defaultThrough, defaultDue, waiverMonthInt);
+                    newRecords.push(newRow);
+                }
+
+                // Batch save to Excel
+                const fileHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.waivers);
+                await UpdateExcel(fileHandle, newRecords, "Waiver ID", "Waivers"); 
+
+                // Push to live memory and refresh table
+                if (!window.Workspace.appData.waivers) window.Workspace.appData.waivers = [];
+                window.Workspace.appData.waivers.push(...newRecords);
+                
+                if (typeof populateYearFilter === "function") populateYearFilter();
+                if (typeof renderWaiverTable === "function") renderWaiverTable();
+
+                setupModal.close();
+                alert(`Successfully generated ${newRecords.length} new waiver records for Job ${jobId}!`);
+
+            } catch (err) {
+                console.error("Rollover failed:", err);
+                alert("Error saving rolled-over waivers. Check console.");
+            } finally {
+                confirmSetupBtn.textContent = "Create Waiver Records";
+                confirmSetupBtn.disabled = false;
+            }
+        });
+    }
+});
