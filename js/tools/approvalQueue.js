@@ -246,13 +246,13 @@ async function processApproval() {
         await routeFileLocally(activeQueueItem["File Name"], finalJob, finalVendor, finalWaiverMonth, finalWaiverYear, finalType);
 
         activeQueueItem["Status"] = "Approved";
-        activeQueueItem["Extracted Job ID"] = finalJob; 
-        activeQueueItem["Extracted Vendor ID"] = finalVendor;
+        activeQueueItem["Job ID"] = finalJob; 
+        activeQueueItem["Vendor ID"] = finalVendor;
         activeQueueItem["Waiver Type"] = finalType;
         activeQueueItem["Pay App Month"] = finalPayAppMonth;
         activeQueueItem["Pay App Year"] = finalPayAppYear;
-        activeQueueItem["WaiverMonth"] = finalWaiverMonth;
-        activeQueueItem["WaiverYear"] = finalWaiverYear;
+        activeQueueItem["Waiver Month"] = finalWaiverMonth;
+        activeQueueItem["Waiver Year"] = finalWaiverYear;
         
         const reviewQueueHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.waiverReviewQueue);
         await UpdateExcel(reviewQueueHandle, [activeQueueItem], "Queue ID", "WaiverReviewQueue");
