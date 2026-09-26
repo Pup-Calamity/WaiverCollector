@@ -24,8 +24,8 @@ window.Workspace = {
         noticeTracker: [],
         jobNotes: [],
         billingTracker: [],
-        WaiverReviewQueue: [],
-        WaiverEmails: [],
+        waiverReviewQueue: [],
+        waiverEmails: [],
         BurgList: []
     }
 };
@@ -49,8 +49,8 @@ window.WORKSPACE_FILE_PATHS = {
     billingTracker: "Data/MainData/Billing Checklist.xlsx",
     jobNotes: "Data/MainData/Job Notes.xlsx",
     waiverInvoices: "Data/DailyUpdateData/Waiver Invoices.xlsx",
-    WaiverReviewQueue: "Data/MainData/WaiverReviewQueue.xlsx",
-    WaiverEmails: "Data/MainData/Waiver Emails.xlsx",
+    waiverReviewQueue: "Data/MainData/WaiverReviewQueue.xlsx",
+    waiverEmails: "Data/MainData/Waiver Emails.xlsx",
     BurgList: "Data/MainData/Burg Emails.xlsx"
 };
 // --- Native Database Setup (IndexedDB for remembering the folder) ---
