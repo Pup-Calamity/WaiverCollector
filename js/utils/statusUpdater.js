@@ -23,7 +23,7 @@ async function refreshWaiverStatuses(logMsg = console.log) {
 
         // --- 1. POPULATE / FIX DUE DATE ---
         const jobSettings = jobNotesData.find(j => String(j["Job ID"]).trim().toLowerCase() === jobId) || {};
-        const dueDay = parseInt(jobSettings["Due Day"]) || 25;
+        const dueDay = parseInt(jobSettings["Waiver Due Day"]) || 25;
         const targetMonth = parseInt(waiver["Month"]);
         const targetYear = parseInt(waiver["Year"]);
         

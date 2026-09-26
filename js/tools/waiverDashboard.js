@@ -589,7 +589,7 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-    
+
     // --- The Generator & Excel Saver ---
     if (confirmSetupBtn) {
         confirmSetupBtn.addEventListener('click', async () => {
@@ -612,7 +612,7 @@ window.addEventListener('DOMContentLoaded', () => {
                     const { startDay, endingDay, waiverMonthInt } = calculatePeriodDates(targetMonth, targetYear, "trailing", jobSettings["Through Day"] || 31);
                     const defaultThrough = `${startDay.toLocaleDateString()} to ${endingDay.toLocaleDateString()}`;
                     
-                    const dueDay = parseInt(jobSettings["Due Day"]) || 25;
+                    const dueDay = parseInt(jobSettings["Waiver Due Day"]) || 25;
                     const defaultDue = new Date(targetYear, parseInt(targetMonth), dueDay).toLocaleDateString();
 
                     // Uses prepareNewWaiver from waiverTool.js
@@ -640,6 +640,155 @@ window.addEventListener('DOMContentLoaded', () => {
             } finally {
                 confirmSetupBtn.textContent = "Create Waiver Records";
                 confirmSetupBtn.disabled = false;
+            }
+        });
+    }
+});
+
+// ==========================================
+// NEW JOB SETUP WIZARD ENGINE
+// ==========================================
+
+window.addEventListener('DOMContentLoaded', () => {
+    const jobModal = document.getElementById('setupJobModal');
+    const openJobBtn = document.getElementById('openSetupJobBtn');
+    const cancelJobBtn = document.getElementById('cancelNewJobBtn');
+    const jobForm = document.getElementById('setupJobForm');
+    const jobIdInput = document.getElementById('njJobId');
+
+    if (openJobBtn) {
+        openJobBtn.addEventListener('click', () => {
+            document.getElementById('njJobId').value = "";
+            document.getElementById('njJobName').value = "";
+            document.getElementById('njVendorId').value = "";
+            document.getElementById('njContractAmt').value = "";
+            document.getElementById('njCondTemp').value = "Standard_Cond";
+            document.getElementById('njUncondTemp').value = "Standard_Uncond";
+            document.getElementById('njFinalTemp').value = "Standard_Final";
+            if (jobModal) jobModal.showModal();
+        });
+    }
+
+    if (cancelJobBtn) {
+        cancelJobBtn.addEventListener('click', () => {
+            if (jobModal) jobModal.close();
+        });
+    }
+
+    // --- ERP Auto-Reference / Autofill on Job ID Blur ---
+    if (jobIdInput) {
+        jobIdInput.addEventListener('blur', () => {
+            const enteredId = jobIdInput.value.trim().toLowerCase();
+            if (!enteredId) return;
+
+            const jobInfoData = window.Workspace.appData.jobInfo || [];
+            const foundJob = jobInfoData.find(j => String(j["Job ID"] || "").trim().toLowerCase() === enteredId);
+
+            if (foundJob) {
+                // Pre-fill from ERP data, but leave inputs completely open for user overwrite
+                const jobNameField = document.getElementById('njJobName');
+                if (jobNameField && !jobNameField.value) {
+                    jobNameField.value = foundJob["Job Name"] || "";
+                }
+                console.log(`💡 ERP Auto-Reference: Found match for Job ID ${enteredId}. Fields pre-filled.`);
+            }
+        });
+    }
+
+    if (jobForm) {
+        jobForm.addEventListener('submit', async () => {
+            const jobId = document.getElementById('njJobId').value.trim();
+            const jobName = document.getElementById('njJobName').value.trim(); 
+            const dueDay = document.getElementById('njDueDay').value.trim();
+            const throughDay = document.getElementById('njThroughDay').value.trim();
+            const condRule = document.getElementById('njCondRule').value.trim();
+            const uncondRule = document.getElementById('njUncondRule').value.trim();
+
+            const vendorId = document.getElementById('njVendorId').value.trim();
+            const vendorRegion = document.getElementById('njVendorRegion').value.trim();
+            const contractAmt = document.getElementById('njContractAmt').value.trim();
+            const condTemp = document.getElementById('njCondTemp').value.trim();
+            const uncondTemp = document.getElementById('njUncondTemp').value.trim();
+            const finalTemp = document.getElementById('njFinalTemp').value.trim();
+
+            if (!jobId) return alert("Job ID is required.");
+
+            const saveBtn = document.getElementById('saveNewJobBtn');
+            saveBtn.textContent = "Saving...";
+            saveBtn.disabled = true;
+
+            try {
+                // 1. Build Job Notes Record
+                const newJobNoteRow = {
+                    "Job ID": jobId,
+                    "Conditional": condRule,
+                    "Unconditional": uncondRule,
+                    "Waiver Due Day": dueDay,
+                    "Through Day": throughDay,
+                    "Skip Zero": "",
+                    "Notes": "",
+                    "Collection Notes": ""
+                };
+
+                // 2. Build Contract Info Record
+                let newContractRow = null;
+                if (vendorId) {
+                    newContractRow = {
+                        "Key": `${jobId}-${vendorId}`,
+                        "Vendor ID": vendorId,
+                        "Vendor Region": vendorRegion,
+                        "Vendor Name": "",
+                        "Job ID": jobId,
+                        "Job Name": jobName, // Custom or ERP-derived value
+                        "Owner": "",
+                        "GC Name": "",
+                        "GC Numbers": "",
+                        "Job Street": "",
+                        "Job City": "",
+                        "Job State": "",
+                        "Job Zip": "",
+                        "Job County": "",
+                        "Contract Description": "",
+                        "Contract Date": "",
+                        "Contract Amount": contractAmt,
+                        "Third Tier": "",
+                        "CC": "",
+                        "Special Email Note": "",
+                        "Contract Note": "",
+                        "Invoice Reference": "",
+                        "Conditional Template": condTemp,
+                        "Unconditional Template": uncondTemp,
+                        "Conditional Final Template": "",
+                        "Final Template": finalTemp,
+                        "Final Collected": "",
+                        "Final Date": "",
+                        "Manual Only": ""
+                    };
+                }
+
+                // 3. Save to Job Notes Excel (Writable Master Data)
+                if (!window.Workspace.appData.jobNotes) window.Workspace.appData.jobNotes = [];
+                window.Workspace.appData.jobNotes.push(newJobNoteRow);
+                const jobNotesHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.jobNotes);
+                if (jobNotesHandle) await UpdateExcel(jobNotesHandle, [newJobNoteRow], "Job ID", "Job Notes");
+
+                // 4. Save to Contract Info Excel (Writable Master Data)
+                if (newContractRow) {
+                    if (!window.Workspace.appData.contractInfo) window.Workspace.appData.contractInfo = [];
+                    window.Workspace.appData.contractInfo.push(newContractRow);
+                    const contractHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.contractInfo);
+                    if (contractHandle) await UpdateExcel(contractHandle, [newContractRow], "Key", "Contract Info");
+                }
+
+                jobModal.close();
+                alert(`Successfully initialized Job ${jobId} rules and contract data!`);
+
+            } catch (err) {
+                console.error("Failed to setup new job:", err);
+                alert("Error saving job configuration. Check console.");
+            } finally {
+                saveBtn.textContent = "Save Job & Contract";
+                saveBtn.disabled = false;
             }
         });
     }
