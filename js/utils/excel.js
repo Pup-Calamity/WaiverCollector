@@ -140,30 +140,35 @@ async function UpdateExcel(fileHandle, changedRows, uniqueIdKey, sheetName = "Sh
     try {
         console.log("Surgically updating Excel cells to preserve Tables...");
 
-        // 1. Unzip the file into memory
         const file = await fileHandle.getFile();
         const buffer = await file.arrayBuffer();
 
-        // 2. Load workbook using ExcelJS (Preserves Tables, Formatting, and Column order)
         const workbook = new window.ExcelJS.Workbook();
         await workbook.xlsx.load(buffer);
 
-        // 3. Find the sheet
-        let worksheet = workbook.getWorksheet(sheetName);
-        if (!worksheet) worksheet = workbook.worksheets[0]; // Fallback to first sheet
+        // --- ANTI-CORRUPTION FIX 1: Delete Calculation Chain ---
+        // Forces Excel to rebuild its formula map on next open so it doesn't crash
+        delete workbook.calcProperties;
 
-        // 4. Map the headers to their exact column numbers so nothing gets shuffled
+        let worksheet = workbook.getWorksheet(sheetName);
+        if (!worksheet) worksheet = workbook.worksheets[0];
+
+        // --- ANTI-CORRUPTION FIX 2: Safe Header Parsing ---
+        // Prevents rich-text formatting from hiding header names
         const headerRow = worksheet.getRow(1);
         const headers = {};
         headerRow.eachCell((cell, colNumber) => {
-            headers[cell.value] = colNumber;
+            let cellVal = cell.value;
+            if (cellVal && typeof cellVal === 'object' && cellVal.richText) {
+                cellVal = cellVal.richText.map(t => t.text).join('');
+            }
+            if (cellVal) headers[String(cellVal).trim()] = colNumber;
         });
 
         if (!headers[uniqueIdKey]) {
-            throw new Error(`Unique ID column "${uniqueIdKey}" not found in sheet.`);
+            throw new Error(`Unique ID column "${uniqueIdKey}" not found. Found: ${Object.keys(headers).join(', ')}`);
         }
 
-        // --- Audit Trail Setup ---
         const activeUser = window.Workspace.currentUser || "Unknown User";
         const now = new Date();
         const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -172,25 +177,33 @@ async function UpdateExcel(fileHandle, changedRows, uniqueIdKey, sheetName = "Sh
         const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const timestampString = `${mm}/${dd}/${yyyy} ${timeString}`;
 
-        // 5. Process changes row by row
         changedRows.forEach(changedRow => {
             changedRow["Last Updated"] = timestampString;
             changedRow["Updated By"] = activeUser;
 
-            const targetId = changedRow[uniqueIdKey];
+            const targetId = String(changedRow[uniqueIdKey]).trim();
             let rowIndexToUpdate = -1;
 
-            // Scan the ID column to find which row to update
+            // --- ANTI-CORRUPTION FIX 3: Bulletproof ID Matching ---
             const idCol = headers[uniqueIdKey];
             worksheet.getColumn(idCol).eachCell((cell, rowNum) => {
-                if (rowNum > 1 && String(cell.value) === String(targetId)) {
-                    rowIndexToUpdate = rowNum;
+                if (rowNum > 1) {
+                    let cellVal = cell.value;
+                    if (cellVal && typeof cellVal === 'object' && cellVal.richText) {
+                        cellVal = cellVal.richText.map(t => t.text).join('');
+                    } else if (cellVal && typeof cellVal === 'object' && cellVal.result) {
+                        cellVal = cellVal.result; // Handle formula results
+                    }
+                    
+                    if (String(cellVal).trim() === targetId) {
+                        rowIndexToUpdate = rowNum;
+                    }
                 }
             });
 
             if (rowIndexToUpdate !== -1) {
+                // UPDATE EXISTING ROW (Safe for Tables)
                 const excelRow = worksheet.getRow(rowIndexToUpdate);
-                // Only update specific cells where the header matches
                 for (const [key, val] of Object.entries(changedRow)) {
                     if (headers[key]) {
                         excelRow.getCell(headers[key]).value = val;
@@ -198,16 +211,16 @@ async function UpdateExcel(fileHandle, changedRows, uniqueIdKey, sheetName = "Sh
                 }
                 excelRow.commit();
             } else {
-                // Append new row mapping exactly to existing columns
+                // APPEND NEW ROW (Only triggers if ID is genuinely missing)
                 const newRowObj = [];
                 for (const [key, colNum] of Object.entries(headers)) {
-                    newRowObj[colNum] = changedRow[key] || "";
+                    newRowObj[colNum] = changedRow[key] !== undefined ? changedRow[key] : "";
                 }
-                worksheet.addRow(newRowObj);
+                worksheet.addRow(newRowObj).commit();
             }
         });
 
-        // 6. Re-zip and write the file back out natively
+        // Write the clean, uncorrupted buffer back to disk
         const outBuffer = await workbook.xlsx.writeBuffer();
         const writableStream = await fileHandle.createWritable();
         await writableStream.write(outBuffer);
