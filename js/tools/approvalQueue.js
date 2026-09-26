@@ -71,7 +71,6 @@ async function sweepInboxToTriage() {
                     canvas.height = viewport.height; 
                     await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
-                    // Extract pixel data for jsQR decoding
                     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const code = jsQR(imgData.data, imgData.width, imgData.height, {
                         inversionAttempts: "dontInvert",
@@ -79,14 +78,16 @@ async function sweepInboxToTriage() {
 
                     if (code) {
                         qrRawValue = code.data;
+                        console.log("🔍 [QR Debug] Raw string read from PDF:", qrRawValue);
+                    } else {
+                        console.log("⚠️ [QR Debug] jsQR could not find a code on page 1 of:", entry.name);
                     }
                 }
 
-               if (qrRawValue) {
-                    // Example barcode format: "21587 0000036046 012027 |122026 UNCOND"
+                if (qrRawValue) {
                     const parts = qrRawValue.split(' ');
+                    console.log("✂️ [QR Debug] Split parts array:", parts);
                     
-                    // Map directly to your exact Excel template columns
                     row["Job ID"] = parts[0] || "";
                     row["Vendor ID"] = parts[1] ? parts[1].replace(/^0+/, '') : "";
                     
@@ -94,7 +95,7 @@ async function sweepInboxToTriage() {
                     row["Pay App Month"] = payAppRaw.substring(0, 2);
                     row["Pay App Year"] = payAppRaw.substring(2, 6);
                     
-                    const wDateRaw = (parts[3] || "").replace('|', ''); // Strips the pipe symbol
+                    const wDateRaw = (parts[3] || "").replace('|', '');
                     row["Waiver Month"] = wDateRaw.substring(0, 2);
                     row["Waiver Year"] = wDateRaw.substring(2, 6);
                     
@@ -120,9 +121,9 @@ async function sweepInboxToTriage() {
     }
 
     if (updatesToExcel.length > 0) {
-        console.log(`Swept ${filesScanned} files from Inbox to Triage and extracted QR data.`);
+        console.log(`Swept ${filesScanned} files from Inbox to Triage.`);
         const queueFileHandle = await getFileByPath(window.Workspace.dirHandle, window.WORKSPACE_FILE_PATHS.waiverReviewQueue);
-        await UpdateExcel(queueFileHandle, updatesToExcel, "Queue ID", "WaiverReviewQueue");
+        await UpdateExcel(queueFileHandle, updatesToExcel, "Queue ID", "waiverReviewQueue");
     }
 }
 
