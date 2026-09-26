@@ -134,37 +134,26 @@ async function UpdateExcel(fileHandle, changedRows, uniqueIdKey, sheetName = "Sh
         console.error("Failed to merge and save:", error);
     }
 }
+
 async function writeDataToExcel(fileHandle, jsonData, sheetName = "Sheet1") {
     try {
-        // 1. Read the existing file back into memory so we keep its workbook structure & tables
+        // 1. Read the existing workbook to preserve structure
         const file = await fileHandle.getFile();
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array' });
         
-        // 2. Determine the correct target sheet name
         let targetSheetName = sheetName;
         if (!workbook.Sheets[targetSheetName]) {
             targetSheetName = workbook.SheetNames[0] || "Sheet1";
         }
         
-        const worksheet = workbook.Sheets[targetSheetName];
-
-        // 3. Clear out old cell data safely
-        // (We blank the range so old ghost rows don't linger if the dataset shrinks)
-        if (worksheet['!ref']) {
-            const range = XLSX.utils.decode_range(worksheet['!ref']);
-            for (let R = range.s.r; R <= range.e.r; ++R) {
-                for (let C = range.s.c; C <= range.e.c; ++C) {
-                    const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-                    delete worksheet[cellAddress];
-                }
-            }
-        }
-
-        // 4. In-place update: Write the new JSON array directly into the existing sheet
-        XLSX.utils.sheet_add_json(worksheet, jsonData, { skipHeader: false, origin: "A1" });
-
-        // 5. Package and write back out while preserving original table/workbook XML structure
+        // 2. Generate a clean worksheet from the updated JSON data
+        const newWorksheet = XLSX.utils.json_to_sheet(jsonData);
+        
+        // 3. Replace the sheet in the workbook cleanly
+        workbook.Sheets[targetSheetName] = newWorksheet;
+        
+        // 4. Write back to disk
         const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
         
         const writableStream = await fileHandle.createWritable();
