@@ -382,19 +382,6 @@
                 </select>
                 <button id="deleteTemplateBtn" class="primary-btn" disabled style="background: #dc3545;">Delete Entire Template</button>
             </div>
-
-            <!-- Toolbar Card -->
-            <div class="card" style="padding: 20px; text-align: left; background: var(--bg-color);">
-                <h3 style="margin-top: 0; font-size: 1.1em; color: var(--text-main);">Drawing Tools</h3>
-                <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;">
-                    <label style="cursor: pointer; font-weight: bold; color: var(--text-main);">
-                        <input type="radio" name="toolMode" value="variable" checked> 🟢 Draw New Variable Box
-                    </label>
-                    <label style="cursor: pointer; font-weight: bold; color: var(--text-main);">
-                        <input type="radio" name="toolMode" value="coverup"> ⬜ Draw New Whiteout Box
-                    </label>
-                </div>
-            </div>
             
             <!-- NEW: Selected Item Control Panel -->
             <div class="card" style="padding: 20px; text-align: left; background: var(--surface-color); grid-column: span 2; border-left: 4px solid #3b82f6;">
@@ -416,12 +403,55 @@
         
         <div id="output" style="background: #1e1e1e; color: #4af626; padding: 15px; border-radius: 8px; font-family: monospace; height: 60px; overflow-y: auto; margin-bottom: 15px;">System Ready. Load a PDF to begin.</div>
         
-        <div style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 10px;">
+        <!-- Page Navigation -->
+        <div style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 15px;">
             <button id="prevPageBtn" class="primary-btn" disabled style="width: auto; background: #6c757d; padding: 6px 15px;">◀ Prev</button>
             <span id="pageIndicator" style="font-weight: bold; color: var(--text-main); font-size: 1.1em;">Page 1 of 1</span>
             <button id="nextPageBtn" class="primary-btn" disabled style="width: auto; background: #6c757d; padding: 6px 15px;">Next ▶</button>
         </div>
 
+        <!-- New Sleek Toolbar -->
+        <style>
+            /* Hides the default radio circles */
+            .tool-radio { display: none; }
+            
+            /* Styles the label to look like a flat toolbar button */
+            .tool-btn {
+                cursor: pointer;
+                padding: 8px 16px;
+                border-radius: 6px;
+                border: 2px solid transparent;
+                font-weight: bold;
+                color: var(--text-muted);
+                background: transparent;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            
+            .tool-btn:hover { background: var(--bg-color); }
+
+            /* When selected, outline it in the tool's specific color */
+            #toolVar:checked + .tool-btn { border-color: #10b981; color: #10b981; background: var(--bg-color); }
+            #toolCover:checked + .tool-btn { border-color: #ef4444; color: #ef4444; background: var(--bg-color); }
+            #toolText:checked + .tool-btn { border-color: #3b82f6; color: #3b82f6; background: var(--bg-color); }
+        </style>
+
+        <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; background: var(--surface-color); padding: 8px; border-radius: 8px; border: 1px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            
+            <input type="radio" id="toolVar" name="toolMode" value="variable" class="tool-radio" checked>
+            <label for="toolVar" class="tool-btn">🟩 Data Variable</label>
+            
+            <input type="radio" id="toolCover" name="toolMode" value="coverup" class="tool-radio">
+            <label for="toolCover" class="tool-btn">🟥 Whiteout Box</label>
+
+            <input type="radio" id="toolText" name="toolMode" value="staticText" class="tool-radio">
+            <label for="toolText" class="tool-btn">🟦 Custom Text</label>
+
+        </div>
+
+        <!-- The Canvas -->
         <div style="background: white; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; display: flex; justify-content: center; padding: 20px;">
             <canvas id="pdfCanvas" style="border: 1px solid #ccc; max-width: 100%; cursor: crosshair; user-select: none;"></canvas>
         </div>

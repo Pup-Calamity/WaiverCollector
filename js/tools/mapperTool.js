@@ -48,8 +48,9 @@ let pdfViewport = null;
 let pdfDocument = null; 
 let currentPageNum = 1; 
 let totalPages = 1;     
-// NOW DEFAULTS TO AN ARRAY FOR FIELDS!
-let templateMap = { fields: [], coverUps: [] };
+
+// Added staticTexts array for custom text mapping
+let templateMap = { fields: [], coverUps: [], staticTexts: [] };
 let currentPdfName = "Template"; 
 let currentPdfBytes = null; 
 let offscreenCanvas = null;
@@ -194,10 +195,11 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
                 templateMap.fields = convertedArray;
             }
             if (!templateMap.coverUps) templateMap.coverUps = [];
+            if (!templateMap.staticTexts) templateMap.staticTexts = []; // Backward compatibility
             
             if (output) output.textContent = `Loaded existing map for ${currentPdfName}.`;
         } catch (err) {
-            templateMap = { fields: [], coverUps: [] };
+            templateMap = { fields: [], coverUps: [], staticTexts: [] };
             if (output) output.textContent = `Loaded ${currentPdfName}. No existing map found.`;
         }
         
@@ -252,7 +254,7 @@ if (deleteTemplateBtn) {
                 const canvas = document.getElementById('pdfCanvas');
                 const ctx = canvas.getContext('2d');
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                templateMap = { fields: [], coverUps: [] };
+                templateMap = { fields: [], coverUps: [], staticTexts: [] };
                 
                 await refreshTemplateList();
             } catch (error) { 
@@ -322,22 +324,32 @@ function updateSelectionUI() {
         nameLabel.textContent = "Nothing selected. Click a box on the canvas.";
         delBtn.disabled = true;
     } else {
-        const name = selectedField.type === 'variable' 
-            ? `Variable: [ ${templateMap.fields[selectedField.id].variable} ]` 
-            : `Whiteout Box #${selectedField.id + 1}`;
+        let name = "";
+        if (selectedField.type === 'variable') {
+            name = `Variable: [ ${templateMap.fields[selectedField.id].variable} ]`;
+        } else if (selectedField.type === 'coverup') {
+            name = `Whiteout Box #${selectedField.id + 1}`;
+        } else if (selectedField.type === 'staticText') {
+            name = `Custom Text: "${templateMap.staticTexts[selectedField.id].text}"`;
+        }
+
         nameLabel.innerHTML = `<strong style="color: var(--brand-color);">${name}</strong><br>Drag the center to move. Drag the bottom-right handle to resize.`;
         delBtn.disabled = false;
     }
 }
 
-// Bind Delete Button in UI (uses splice for arrays!)
+// Bind Delete Button in UI (uses splice for arrays)
 document.getElementById('deleteSelectionBtn')?.addEventListener('click', () => {
     if (!selectedField) return;
+    
     if (selectedField.type === 'variable') {
         templateMap.fields.splice(selectedField.id, 1);
-    } else {
+    } else if (selectedField.type === 'coverup') {
         templateMap.coverUps.splice(selectedField.id, 1);
+    } else if (selectedField.type === 'staticText') {
+        templateMap.staticTexts.splice(selectedField.id, 1);
     }
+
     selectedField = null;
     updateSelectionUI();
     redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap, selectedField, currentPageNum);
@@ -353,7 +365,9 @@ if (canvas) {
         
         if (target && confirm(`Delete this item?`)) {
             if (target.type === 'variable') templateMap.fields.splice(target.id, 1);
-            else templateMap.coverUps.splice(target.id, 1);
+            else if (target.type === 'coverup') templateMap.coverUps.splice(target.id, 1);
+            else if (target.type === 'staticText') templateMap.staticTexts.splice(target.id, 1);
+            
             selectedField = null;
             updateSelectionUI();
             redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap, selectedField, currentPageNum);
@@ -373,7 +387,9 @@ if (canvas) {
             selectedField = { type: dragField.type, id: dragField.id };
             updateSelectionUI();
 
-            const field = dragField.type === 'variable' ? templateMap.fields[dragField.id] : templateMap.coverUps[dragField.id];
+            const field = dragField.type === 'variable' ? templateMap.fields[dragField.id] : 
+                          dragField.type === 'coverup' ? templateMap.coverUps[dragField.id] :
+                          templateMap.staticTexts[dragField.id];
 
             if (dragField.action === 'resize') {
                 isResizing = true;
@@ -419,7 +435,9 @@ if (canvas) {
             const deltaX = (mouseX - drawStartX) / pdfViewport.scale;
             const deltaY = (mouseY - drawStartY) / pdfViewport.scale;
             
-            const field = dragField.type === 'variable' ? templateMap.fields[dragField.id] : templateMap.coverUps[dragField.id];
+            const field = dragField.type === 'variable' ? templateMap.fields[dragField.id] : 
+                          dragField.type === 'coverup' ? templateMap.coverUps[dragField.id] :
+                          templateMap.staticTexts[dragField.id];
             
             const newW = Math.max(10, initialWidth + deltaX);
             const newH = Math.max(10, initialHeight + deltaY);
@@ -431,12 +449,14 @@ if (canvas) {
 
             redrawCanvas(canvas, offscreenCanvas, pdfViewport, templateMap, selectedField, currentPageNum);
         }
-        else if (isDragging && dragField && (dragField.type === 'variable' || dragField.type === 'coverup')) {
+        else if (isDragging && dragField && (dragField.type === 'variable' || dragField.type === 'coverup' || dragField.type === 'staticText')) {
             hasMoved = true;
             const pdfX = mouseX / pdfViewport.scale;
             const pdfY = (pdfViewport.height - mouseY) / pdfViewport.scale;
 
-            const field = dragField.type === 'variable' ? templateMap.fields[dragField.id] : templateMap.coverUps[dragField.id];
+            const field = dragField.type === 'variable' ? templateMap.fields[dragField.id] : 
+                          dragField.type === 'coverup' ? templateMap.coverUps[dragField.id] :
+                          templateMap.staticTexts[dragField.id];
             field.x = pdfX - dragOffsetX;
             field.y = pdfY - dragOffsetY;
             
@@ -453,10 +473,13 @@ if (canvas) {
             const ctx = canvas.getContext('2d');
             if (dragField.tool === 'coverup') {
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-                ctx.strokeStyle = '#dc3545';
+                ctx.strokeStyle = '#dc3545'; // Red
+            } else if (dragField.tool === 'staticText') {
+                ctx.fillStyle = 'rgba(38, 138, 246, 0.3)'; 
+                ctx.strokeStyle = '#268af6'; // Blue
             } else {
                 ctx.fillStyle = 'rgba(74, 246, 38, 0.3)'; 
-                ctx.strokeStyle = '#4af626';
+                ctx.strokeStyle = '#4af626'; // Green
             }
             ctx.fillRect(boxX, boxY, boxW, boxH);
             ctx.lineWidth = 2;
@@ -483,10 +506,15 @@ if (canvas) {
                 if (dragField.tool === 'coverup') {
                     templateMap.coverUps.push({ x: pdfX, y: pdfY, width: pdfW, height: pdfH, page: currentPageNum });
                     selectedField = { type: 'coverup', id: templateMap.coverUps.length - 1 };
+                } else if (dragField.tool === 'staticText') {
+                    const customText = prompt("Enter the custom text for this box:");
+                    if (customText && customText.trim() !== "") {
+                        templateMap.staticTexts.push({ text: customText.trim(), x: pdfX, y: pdfY, width: pdfW, height: pdfH, page: currentPageNum });
+                        selectedField = { type: 'staticText', id: templateMap.staticTexts.length - 1 };
+                    }
                 } else if (dragField.tool === 'variable') {
                     const variableName = await openVariableModal();
                     if (variableName) {
-                        // PUSHES TO THE ARRAY SO IT CAN BE USED INFINITELY!
                         templateMap.fields.push({ variable: variableName, x: pdfX, y: pdfY, width: pdfW, height: pdfH, page: currentPageNum });
                         selectedField = { type: 'variable', id: templateMap.fields.length - 1 };
                     }
