@@ -51,6 +51,25 @@ export function redrawCanvas(canvas, bgCanvas, viewport, map, selectedItem = nul
             ctx.fillText(field.variable, px + 4, py + 16);
         });
     }
+
+    if (map.staticTexts) {
+        map.staticTexts.forEach((st, index) => {
+            const itemPage = st.page || 1;
+            if (itemPage !== currentPageNum) return;
+
+            const px = st.x * viewport.scale;
+            const ph = (st.height || 15) * viewport.scale;
+            const py = viewport.height - (st.y * viewport.scale) - ph;
+            const pw = (st.width || 60) * viewport.scale;
+
+            const isSelected = selectedItem && selectedItem.type === 'staticText' && selectedItem.id === index;
+            drawBox(px, py, pw, ph, { fill: 'rgba(38, 138, 246, 0.3)', stroke: '#268af6' }, isSelected);
+            
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 12px Arial';
+            ctx.fillText(`Text: "${st.text}"`, px + 4, py + 16);
+        });
+    }
 }
 
 export function getHoveredItem(mouseX, mouseY, viewport, map, currentPageNum = 1) {
@@ -82,6 +101,25 @@ export function getHoveredItem(mouseX, mouseY, viewport, map, currentPageNum = 1
             const action = checkHit(box.x, box.y, box.width, box.height);
             if (action) return { type: 'coverup', id: i, action };
         }
+    }
+
+    if (map.staticTexts) {
+        map.staticTexts.forEach((st, index) => {
+            const itemPage = st.page || 1;
+            if (itemPage !== currentPageNum) return;
+
+            const px = st.x * viewport.scale;
+            const ph = (st.height || 15) * viewport.scale;
+            const py = viewport.height - (st.y * viewport.scale) - ph;
+            const pw = (st.width || 60) * viewport.scale;
+
+            const isSelected = selectedItem && selectedItem.type === 'staticText' && selectedItem.id === index;
+            drawBox(px, py, pw, ph, { fill: 'rgba(38, 138, 246, 0.3)', stroke: '#268af6' }, isSelected);
+            
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 12px Arial';
+            ctx.fillText(`Text: "${st.text}"`, px + 4, py + 16);
+        });
     }
     return null;
 }

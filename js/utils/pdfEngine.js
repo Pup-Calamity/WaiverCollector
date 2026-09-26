@@ -73,28 +73,24 @@ window.stampWaiverWithConfig = async function(pdfArrayBuffer, vendorData, config
                 let lines = [textToPrint];
 
                 if (isBoxed) {
-                    // Ensure we don't start bigger than the box itself
                     finalFontSize = Math.min(12, field.height);
                     
-                    // Auto-Size Loop for Multiline Text
                     while (finalFontSize > 4) {
                         lines = wrapText(textToPrint, font, finalFontSize, field.width);
-                        const totalTextHeight = lines.length * (finalFontSize * 1.2); // 20% line spacing
+                        const totalTextHeight = lines.length * (finalFontSize * 1.2);
                         
                         if (totalTextHeight <= field.height) {
-                            break; // The paragraph fits!
+                            break; 
                         }
-                        finalFontSize -= 0.5; // Shrink font and try re-wrapping
+                        finalFontSize -= 0.5; 
                     }
                 } else if (isBarcode) {
-                    finalFontSize = 8; // Lock barcode to 8pt
+                    finalFontSize = 8; 
                 } else {
-                    finalFontSize = field.size || 12; // Legacy dot fallback
+                    finalFontSize = field.size || 12; 
                 }
 
-                // --- RENDERING PHASE ---
                 if (isBarcode) {
-                    // Generate High Error-Correction QR Code
                     const qrDataUrl = await QRCode.toDataURL(textToPrint, { 
                         errorCorrectionLevel: 'H',
                         margin: 1,
@@ -112,14 +108,10 @@ window.stampWaiverWithConfig = async function(pdfArrayBuffer, vendorData, config
                     });
                 } 
                 else if (isBoxed) {
-                    // Vertically center the paragraph inside the green box
                     const totalTextHeight = lines.length * (finalFontSize * 1.2);
                     const emptySpace = field.height - totalTextHeight;
-                    
-                    // Calculate the starting Y position (Top of box, minus half the empty space, minus font ascender)
                     let currentY = (field.y + field.height) - (emptySpace / 2) - finalFontSize;
                     
-                    // Draw each line of the paragraph
                     for (const line of lines) {
                         targetPage.drawText(line, {
                             x: field.x,
@@ -128,14 +120,65 @@ window.stampWaiverWithConfig = async function(pdfArrayBuffer, vendorData, config
                             font: font,
                             color: rgb(0, 0, 0)
                         });
-                        currentY -= (finalFontSize * 1.2); // Move down for the next line
+                        currentY -= (finalFontSize * 1.2);
                     }
                 } 
                 else {
-                    // Legacy single-dot rendering
                     targetPage.drawText(textToPrint, {
                         x: field.x,
                         y: field.y,
+                        size: finalFontSize,
+                        font: font,
+                        color: rgb(0, 0, 0)
+                    });
+                }
+            }
+        }
+    }
+
+    // 3. Stamp Static Custom Text Boxes
+    if (configJson.staticTexts) {
+        for (const st of configJson.staticTexts) {
+            const textToPrint = st.text || "";
+            if (textToPrint.trim() !== "") {
+                const pageNum = st.page || 1;
+                const targetPage = pages[pageNum - 1] || firstPage;
+                const isBoxed = st.width && st.height;
+                
+                let finalFontSize = 12;
+                let lines = [textToPrint];
+
+                if (isBoxed) {
+                    finalFontSize = Math.min(12, st.height);
+                    while (finalFontSize > 4) {
+                        lines = wrapText(textToPrint, font, finalFontSize, st.width);
+                        const totalTextHeight = lines.length * (finalFontSize * 1.2);
+                        if (totalTextHeight <= st.height) break;
+                        finalFontSize -= 0.5;
+                    }
+                } else {
+                    finalFontSize = st.size || 12;
+                }
+
+                if (isBoxed) {
+                    const totalTextHeight = lines.length * (finalFontSize * 1.2);
+                    const emptySpace = st.height - totalTextHeight;
+                    let currentY = (st.y + st.height) - (emptySpace / 2) - finalFontSize;
+                    
+                    for (const line of lines) {
+                        targetPage.drawText(line, {
+                            x: st.x,
+                            y: currentY,
+                            size: finalFontSize,
+                            font: font,
+                            color: rgb(0, 0, 0)
+                        });
+                        currentY -= (finalFontSize * 1.2);
+                    }
+                } else {
+                    targetPage.drawText(textToPrint, {
+                        x: st.x,
+                        y: st.y,
                         size: finalFontSize,
                         font: font,
                         color: rgb(0, 0, 0)
