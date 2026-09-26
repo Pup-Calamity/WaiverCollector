@@ -362,7 +362,7 @@ window.addEventListener('DOMContentLoaded', () => {
     function createVendorRow() {
         const rowDiv = document.createElement('div');
         rowDiv.className = 'vendor-row';
-        rowDiv.style.cssText = "background: var(--bg-color); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 6px;";
+        rowDiv.style.cssText = "background: var(--bg-color); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px;";
         
         const vendorInfoData = window.Workspace.appData.vendorInfo || [];
         const uniqueRegions = [...new Set(vendorInfoData.map(v => String(v["Vendor Region"] || "").trim()))].filter(Boolean);
@@ -370,10 +370,11 @@ window.addEventListener('DOMContentLoaded', () => {
         regionOptions += `<option value="NEW">➕ Add New Region...</option>`;
 
         rowDiv.innerHTML = `
+            <!-- Row 1: Core IDs & Contract Financials -->
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1.2fr 1fr 30px; gap: 6px; align-items: center;">
                 <input type="text" class="v-id" placeholder="Vendor ID *" style="margin:0; padding:6px; font-size:0.85em;" required>
                 
-                <select class="v-reg-select" style="margin:0; padding:6px; font-size:0.85em;">
+                <select class="v-reg-select" style="margin:0; padding:6px; font-size:0.85em;" title="Vendor Region">
                     ${regionOptions}
                 </select>
 
@@ -382,7 +383,29 @@ window.addEventListener('DOMContentLoaded', () => {
                 <input type="date" class="v-date" style="margin:0; padding:5px; font-size:0.85em;" title="Contract Date">
                 <button type="button" class="remove-vendor-btn" style="background: transparent; border: none; color: #ef4444; font-size: 1.2em; cursor: pointer; font-weight: bold;" title="Remove Vendor">×</button>
             </div>
-            <!-- metadata inputs... (owner, gc name, etc.) -->
+
+            <!-- Row 2: Project Metadata (Owner, GC, Third Tier, CC, Manual) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr; gap: 6px;">
+                <input type="text" class="v-owner" placeholder="Owner Name" style="margin:0; padding:5px; font-size:0.8em;">
+                <input type="text" class="v-gcname" placeholder="GC Name" style="margin:0; padding:5px; font-size:0.8em;">
+                <input type="text" class="v-gcnum" placeholder="GC Numbers" style="margin:0; padding:5px; font-size:0.8em;">
+                <input type="text" class="v-tier" placeholder="Third Tier (Hiring)" style="margin:0; padding:5px; font-size:0.8em;">
+                <input type="text" class="v-cc" placeholder="Special CCs (;)" style="margin:0; padding:5px; font-size:0.8em;">
+                <select class="v-manual" style="margin:0; padding:5px; font-size:0.8em;">
+                    <option value="">Manual: No</option>
+                    <option value="Yes">Manual: Yes</option>
+                </select>
+            </div>
+
+            <!-- Row 3: Word Templates -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;">
+                <input type="text" class="v-cond" placeholder="Conditional Template" value="Standard_Cond" style="margin:0; padding:5px; font-size:0.8em;">
+                <input type="text" class="v-uncond" placeholder="Unconditional Template" value="Standard_Uncond" style="margin:0; padding:5px; font-size:0.8em;">
+                <input type="text" class="v-final" placeholder="Final Template" value="Standard_Final" style="margin:0; padding:5px; font-size:0.8em;">
+            </div>
+
+            <!-- Row 4: Special Email Notes -->
+            <input type="text" class="v-note" placeholder="Special Email Note (optional)..." style="margin:0; padding:5px; font-size:0.8em; width:100%;">
         `;
 
         const regSelect = rowDiv.querySelector('.v-reg-select');
@@ -397,7 +420,6 @@ window.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // Open the New Region Dialog
                 document.getElementById('nvrVendorId').value = currentVId;
                 document.getElementById('nvrRegionNum').value = "";
                 document.getElementById('nvrDesc').value = "";
@@ -407,7 +429,6 @@ window.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('nvrAddress').value = "";
                 document.getElementById('nvrNotes').value = "";
                 
-                // Store active reference element so we can update it when saved
                 window._activeRegionSelect = regSelect;
                 document.getElementById('newVendorRegionModal').showModal();
             }
