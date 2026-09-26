@@ -90,8 +90,10 @@ window.stampWaiverWithConfig = async function(pdfArrayBuffer, vendorData, config
                     finalFontSize = field.size || 12; 
                 }
 
+                // --- RENDERING PHASE ---
                 if (isBarcode) {
-                    const qrDataUrl = await QRCode.toDataURL(textToPrint, { 
+                    // Generate High Error-Correction QR Code using window.QRCode explicitly
+                    const qrDataUrl = await window.QRCode.toDataURL(textToPrint, { 
                         errorCorrectionLevel: 'H',
                         margin: 1,
                         width: 150 
@@ -106,7 +108,7 @@ window.stampWaiverWithConfig = async function(pdfArrayBuffer, vendorData, config
                         width: boxSize,
                         height: boxSize
                     });
-                } 
+                }
                 else if (isBoxed) {
                     const totalTextHeight = lines.length * (finalFontSize * 1.2);
                     const emptySpace = field.height - totalTextHeight;
