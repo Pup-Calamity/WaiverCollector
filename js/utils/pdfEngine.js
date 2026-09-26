@@ -92,18 +92,33 @@ window.stampWaiverWithConfig = async function(pdfArrayBuffer, vendorData, config
 
                 // --- RENDERING PHASE ---
                 if (isBarcode) {
-                    // Safe lookup supporting multiple global CDN export names
-                    const qrLib = window.QRCode || window.qrcode;
-                    if (!qrLib || typeof qrLib.toDataURL !== 'function') {
-                        throw new Error("QR Code library is not loaded or missing toDataURL method.");
+                    // Initialize qrcode-generator for type number 0 (auto) and error correction 'H'
+                    const qr = qrcode(0, 'H');
+                    qr.addData(textToPrint);
+                    qr.make();
+
+                    // Create an invisible canvas to render the QR code module matrix
+                    const moduleCount = qr.getModuleCount();
+                    const canvasSize = 150;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = canvasSize;
+                    canvas.height = canvasSize;
+                    const ctx = canvas.getContext('2d');
+
+                    const tileSize = canvasSize / moduleCount;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvasSize, canvasSize);
+                    
+                    ctx.fillStyle = '#000000';
+                    for (let row = 0; row < moduleCount; row++) {
+                        for (let col = 0; col < moduleCount; col++) {
+                            if (qr.isDark(row, col)) {
+                                ctx.fillRect(col * tileSize, row * tileSize, tileSize, tileSize);
+                            }
+                        }
                     }
 
-                    const qrDataUrl = await qrLib.toDataURL(textToPrint, { 
-                        errorCorrectionLevel: 'H',
-                        margin: 1,
-                        width: 150 
-                    });
-                    
+                    const qrDataUrl = canvas.toDataURL('image/png');
                     const qrImage = await pdfDoc.embedPng(qrDataUrl);
                     const boxSize = field.width || 50; 
                     
