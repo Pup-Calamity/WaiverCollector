@@ -67,7 +67,8 @@ export function redrawCanvas(canvas, bgCanvas, viewport, map, selectedItem = nul
             
             ctx.fillStyle = '#000';
             ctx.font = 'bold 12px Arial';
-            ctx.fillText(`Text: "${st.text}"`, px + 4, py + 16);
+            // Clean display tag showing only the actual text inside quotes
+            ctx.fillText(`"${st.text}"`, px + 4, py + 16);
         });
     }
 }
@@ -85,7 +86,6 @@ export function getHoveredItem(mouseX, mouseY, viewport, map, currentPageNum = 1
     };
 
     if (map.fields) {
-        // Loop backward to prioritize clicking the box drawn most recently (top Z-index)
         for (let i = map.fields.length - 1; i >= 0; i--) {
             const field = map.fields[i];
             if ((field.page || 1) !== currentPageNum) continue;
@@ -104,22 +104,13 @@ export function getHoveredItem(mouseX, mouseY, viewport, map, currentPageNum = 1
     }
 
     if (map.staticTexts) {
-        map.staticTexts.forEach((st, index) => {
-            const itemPage = st.page || 1;
-            if (itemPage !== currentPageNum) return;
-
-            const px = st.x * viewport.scale;
-            const ph = (st.height || 15) * viewport.scale;
-            const py = viewport.height - (st.y * viewport.scale) - ph;
-            const pw = (st.width || 60) * viewport.scale;
-
-            const isSelected = selectedItem && selectedItem.type === 'staticText' && selectedItem.id === index;
-            drawBox(px, py, pw, ph, { fill: 'rgba(38, 138, 246, 0.3)', stroke: '#268af6' }, isSelected);
-            
-            ctx.fillStyle = '#000';
-            ctx.font = 'bold 12px Arial';
-            ctx.fillText(`Text: "${st.text}"`, px + 4, py + 16);
-        });
+        for (let i = map.staticTexts.length - 1; i >= 0; i--) {
+            const st = map.staticTexts[i];
+            if ((st.page || 1) !== currentPageNum) continue;
+            const action = checkHit(st.x, st.y, st.width || 60, st.height || 15);
+            if (action) return { type: 'staticText', id: i, action };
+        }
     }
+
     return null;
 }
